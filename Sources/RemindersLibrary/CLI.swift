@@ -282,6 +282,14 @@ private struct Edit: ParsableCommand {
 
     @Option(
         name: .shortAndLong,
+        help: "The new priority of the reminder")
+    var priority: Priority?
+
+    @Flag(help: "Remove the priority from the reminder")
+    var clearPriority = false
+
+    @Option(
+        name: .shortAndLong,
         help: "The notes to set on the reminder, overwriting previous notes")
     var notes: String?
 
@@ -327,15 +335,20 @@ private struct Edit: ParsableCommand {
         if self.dueDate != nil && self.clearDueDate {
             throw ValidationError("Cannot specify both --due-date and --clear-due-date")
         }
+        if self.priority != nil && self.clearPriority {
+            throw ValidationError("Cannot specify both --priority and --clear-priority")
+        }
 
         let changesRecurrence = self.repeat_ != nil || self.repeatInterval != nil
             || self.repeatUntil != nil || self.clearRepeatEnd
 
         if self.reminder.isEmpty && self.notes == nil && self.dueDate == nil
             && !self.clearDueDate && !changesRecurrence && !self.clearRepeat
+            && self.priority == nil && !self.clearPriority
         {
             throw ValidationError(
-                "Must specify new reminder content, new notes, a due date change, or a repeat change")
+                "Must specify new reminder content, new notes, a due date change, a repeat change, "
+                    + "or a priority change")
         }
         if self.clearRepeat && changesRecurrence {
             throw ValidationError("Cannot combine --clear-repeat with another repeat option")
@@ -366,6 +379,8 @@ private struct Edit: ParsableCommand {
             newNotes: self.notes,
             newDueDateComponents: self.dueDate,
             clearDueDate: self.clearDueDate,
+            priority: self.priority,
+            clearPriority: self.clearPriority,
             newRecurrence: self.repeat_,
             newRecurrenceInterval: self.repeatInterval,
             newRecurrenceEndDate: self.repeatUntil,
