@@ -501,6 +501,10 @@ public final class Reminders {
     func getListNames() -> [String] {
         return self.getCalendars().map { $0.title }
     }
+    
+    func getDefaultList() -> String {
+        return Store.defaultCalendarForNewReminders()!.title
+    }
 
     func showLists(outputFormat: OutputFormat) {
         let calendars = self.getCalendars()
