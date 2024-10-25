@@ -32,7 +32,7 @@ extension EKReminder: @retroactive Encodable {
         try container.encode(self.priority, forKey: .priority)
         try container.encode(self.calendar.title, forKey: .list)
         try container.encodeIfPresent(self.notes, forKey: .notes)
-        
+
         // url field is nil
         // https://developer.apple.com/forums/thread/128140
         try container.encodeIfPresent(self.url, forKey: .url)
@@ -87,7 +87,7 @@ extension EKReminder: @retroactive Encodable {
         @unknown default: return nil
         }
     }
-    
+
     private func format(_ date: Date?) -> String? {
         if #available(macOS 12.0, *) {
             return date?.ISO8601Format()
