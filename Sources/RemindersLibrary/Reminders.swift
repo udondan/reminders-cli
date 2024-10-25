@@ -643,7 +643,8 @@ public final class Reminders {
         newRecurrence: Recurrence?, newRecurrenceInterval: Int?,
         newRecurrenceEndDate: DateComponents?,
         clearRecurrenceEnd: Bool,
-        clearRecurrence: Bool)
+        clearRecurrence: Bool,
+        outputFormat: OutputFormat)
     {
         let calendar = self.calendar(withNameOrId: nameOrId)
         let semaphore = DispatchSemaphore(value: 0)
@@ -736,7 +737,12 @@ public final class Reminders {
                         rules: reminder.recurrenceRules ?? [])
                 }
                 try Store.save(reminder, commit: true)
-                print("Updated reminder '\(reminder.title!)'")
+                switch outputFormat {
+                case .json:
+                    print(encodeToJson(data: reminder))
+                case .plain:
+                    print("Updated reminder '\(reminder.title!)'")
+                }
             } catch let error {
                 print("Failed to update reminder with error: \(error.localizedDescription)")
                 exit(1)
@@ -744,18 +750,15 @@ public final class Reminders {
 
             semaphore.signal()
         }
-
         semaphore.wait()
     }
 
-    func setComplete(_ complete: Bool, itemAtIndexOrId indexOrId: String, onListNamedOrId nameOrId: String) {
+    func setComplete(_ complete: Bool, itemAtIndexOrId indexOrId: String, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) {
         let calendar = self.calendar(withNameOrId: nameOrId)
         let semaphore = DispatchSemaphore(value: 0)
-        let displayOptions = complete ? DisplayOptions.incomplete : .complete
         let action = complete ? "Completed" : "Uncompleted"
 
-        self.reminders(on: [calendar], displayOptions: displayOptions) { reminders in
-            print(reminders.map { $0.title! })
+        self.reminders(on: [calendar], displayOptions: complete ? .incomplete : .complete) { reminders in
             guard let reminder = self.getReminder(from: reminders, atIndexOrId: indexOrId) else {
                 print("No reminder at index or with ID \(indexOrId) on \(nameOrId)")
                 exit(1)
@@ -764,15 +767,19 @@ public final class Reminders {
             do {
                 reminder.isCompleted = complete
                 try Store.save(reminder, commit: true)
-                print("\(action) '\(reminder.title!)'")
+                switch outputFormat {
+                case .json:
+                    print(encodeToJson(data: reminder))
+                case .plain:
+                    print("\(action) '\(reminder.title!)'")
+                }
             } catch let error {
-                print("Failed to save reminder with error: \(error)")
+                print("Failed to update reminder with error: \(error)")
                 exit(1)
             }
 
             semaphore.signal()
         }
-
         semaphore.wait()
     }
 
@@ -906,3 +913,4 @@ private func encodeToJson(data: Encodable) -> String {
     let encoded = try! encoder.encode(data)
     return String(data: encoded, encoding: .utf8) ?? ""
 }
+

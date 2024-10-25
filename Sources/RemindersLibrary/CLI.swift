@@ -278,8 +278,15 @@ private struct Complete: ParsableCommand {
         help: "The index or id of the reminder to delete, see 'show' for indexes and IDs")
     var indexOrId: String
 
+    @Option(
+        name: .shortAndLong,
+        help: "Output format (plain or json)")
+    var format: OutputFormat = .plain
+
     func run() {
-        reminders.setComplete(true, itemAtIndexOrId: self.indexOrId, onListNamedOrId: self.listNameOrId)
+        reminders.setComplete(true, itemAtIndexOrId: self.indexOrId,
+                            onListNamedOrId: self.listNameOrId,
+                            outputFormat: format)
     }
 }
 
@@ -296,8 +303,15 @@ private struct Uncomplete: ParsableCommand {
         help: "The index or id of the reminder to delete, see 'show' for indexes and IDs")
     var indexOrId: String
 
+    @Option(
+        name: .shortAndLong,
+        help: "Output format (plain or json)")
+    var format: OutputFormat = .plain
+
     func run() {
-        reminders.setComplete(false, itemAtIndexOrId: self.indexOrId, onListNamedOrId: self.listNameOrId)
+        reminders.setComplete(false, itemAtIndexOrId: self.indexOrId,
+                            onListNamedOrId: self.listNameOrId,
+                            outputFormat: format)
     }
 }
 
@@ -395,6 +409,11 @@ private struct Edit: ParsableCommand {
         help: "The new reminder contents")
     var reminder: [String] = []
 
+    @Option(
+        name: .shortAndLong,
+        help: "Output format (plain or json)")
+    var format: OutputFormat = .plain
+
     func validate() throws {
         if self.dueDate != nil && self.clearDueDate {
             throw ValidationError("Cannot specify both --due-date and --clear-due-date")
@@ -450,7 +469,8 @@ private struct Edit: ParsableCommand {
             newRecurrenceInterval: self.repeatInterval,
             newRecurrenceEndDate: self.repeatUntil,
             clearRecurrenceEnd: self.clearRepeatEnd,
-            clearRecurrence: self.clearRepeat
+            clearRecurrence: self.clearRepeat,
+            outputFormat: format
         )
     }
 }
