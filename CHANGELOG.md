@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.0.1](https://github.com/udondan/reminders-cli/compare/v3.0.1...v3.0.1) (2026-09-13)
+
+
+### Features
+
+* add --default-only option to show-lists ([fc21538](https://github.com/udondan/reminders-cli/commit/fc21538bef37f5ab820401f1fa4a7ab8caf0cc56))
+* add --default-only option to show-lists ([7958274](https://github.com/udondan/reminders-cli/commit/7958274124c74b8282738b38ccd54e6c04f7ff04))
+* make show-lists --default-only honor --format and print the list id ([a90b2a0](https://github.com/udondan/reminders-cli/commit/a90b2a0ddce4be5fc0c31a237e9bcedc6662c2bd))
+
 ## [3.0.1](https://github.com/udondan/reminders-cli/compare/v3.0.0...v3.0.1) (2026-09-13)
 
 
