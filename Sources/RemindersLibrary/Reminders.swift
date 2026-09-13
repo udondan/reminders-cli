@@ -553,6 +553,9 @@ public final class Reminders {
         newNotes: String?,
         newDueDateComponents: DateComponents? = nil,
         clearDueDate: Bool = false,
+        priority: Priority? = nil,
+        clearPriority: Bool = false,
+        newListName: String? = nil,
         newRecurrence: Recurrence?, newRecurrenceInterval: Int?,
         newRecurrenceEndDate: DateComponents?,
         clearRecurrenceEnd: Bool,
@@ -574,6 +577,15 @@ public final class Reminders {
             do {
                 reminder.title = newText ?? reminder.title
                 reminder.notes = newNotes ?? reminder.notes
+                if clearPriority {
+                    reminder.priority = Int(EKReminderPriority.none.rawValue)
+                } else if let priority {
+                    reminder.priority = Int(priority.value.rawValue)
+                }
+
+                if let newListName {
+                    reminder.calendar = self.calendar(withName: newListName)
+                }
 
                 if clearDueDate {
                     reminder.dueDateComponents = nil
