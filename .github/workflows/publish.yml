@@ -2,16 +2,39 @@
 name: Publish
 
 on:
-  release:
-    types:
-      - published
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag of the draft release to attach the tarball to and publish
+        type: string
+        required: true
+      ref:
+        description: Commit to build
+        type: string
+        required: true
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of an existing draft release to attach the tarball to and publish (leave empty to only build)
+        type: string
+        required: false
+        default: ""
+      ref:
+        description: Commit to build (defaults to the tag, or the default branch when no tag is given)
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: write
 
 jobs:
   publish:
     runs-on: macos-14
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || inputs.tag }}
 
       - name: xcode-select
         run: sudo xcode-select -s /Applications/Xcode_16.2.app
@@ -23,14 +46,33 @@ jobs:
         id: checksum
         run: echo "sha256=$(shasum -a 256 reminders.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
 
-      - name: Attach artifact to release
-        if: github.event_name == 'release'
-        run: gh release upload "${{ github.event.release.tag_name }}" reminders.tar.gz
+      - name: Verify release is a draft
+        if: inputs.tag != ''
+        run: |
+          if [ "$(gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft)" != "true" ]; then
+            echo "::error::Release ${TAG} is already published; assets cannot be added to an immutable release."
+            exit 1
+          fi
         env:
           GH_TOKEN: ${{ secrets.OVERRIDE_TOKEN }}
+          TAG: ${{ inputs.tag }}
+
+      - name: Attach artifact to draft release
+        if: inputs.tag != ''
+        run: gh release upload "${TAG}" reminders.tar.gz --clobber --repo "${GITHUB_REPOSITORY}"
+        env:
+          GH_TOKEN: ${{ secrets.OVERRIDE_TOKEN }}
+          TAG: ${{ inputs.tag }}
+
+      - name: Publish release
+        if: inputs.tag != ''
+        run: gh release edit "${TAG}" --draft=false --latest --repo "${GITHUB_REPOSITORY}"
+        env:
+          GH_TOKEN: ${{ secrets.OVERRIDE_TOKEN }}
+          TAG: ${{ inputs.tag }}
 
       - name: Checkout homebrew tap
-        if: github.event_name == 'release'
+        if: inputs.tag != ''
         uses: actions/checkout@v7
         with:
           repository: udondan/homebrew-software
@@ -38,10 +80,10 @@ jobs:
           path: homebrew-software
 
       - name: Update homebrew formula
-        if: github.event_name == 'release'
+        if: inputs.tag != ''
         working-directory: homebrew-software
         run: |
-          VERSION="${{ github.event.release.tag_name }}"
+          VERSION="${TAG}"
           SHA256="${{ steps.checksum.outputs.sha256 }}"
 
           echo "${TEMPLATE}" | sed \
@@ -56,6 +98,7 @@ jobs:
           git commit -m "Release ${VERSION#v}"
           git push
         env:
+          TAG: ${{ inputs.tag }}
           EMAIL: ${{ secrets.EMAIL }}
           TEMPLATE: |
             class RemindersCli < Formula
