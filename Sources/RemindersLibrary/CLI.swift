@@ -65,6 +65,9 @@ private struct ShowAll: ParsableCommand {
     @Option(help: "Only show reminders from this list; repeat to specify multiple")
     var list: [String] = []
 
+    @Option(help: "Only show completed reminders completed on or after this date")
+    var completedSince: DateComponents?
+
     @Option(
         name: .shortAndLong,
         help: "format, either of 'plain' or 'json'")
@@ -82,6 +85,10 @@ private struct ShowAll: ParsableCommand {
             throw ValidationError(
                 "Cannot combine --no-due-date with --due-date, --due-before, --due-after, --overdue, or --include-overdue")
         }
+        if self.completedSince != nil && !self.onlyCompleted && !self.includeCompleted {
+            throw ValidationError(
+                "--completed-since requires --only-completed or --include-completed")
+        }
     }
 
     func run() {
@@ -96,7 +103,7 @@ private struct ShowAll: ParsableCommand {
             dueOn: self.dueDate, includeOverdue: self.includeOverdue,
             overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
             noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
-            lists: self.list,
+            lists: self.list, completedSince: self.completedSince,
             displayOptions: displayOptions, outputFormat: format, sort: sort, sortOrder: sortOrder)
     }
 }
@@ -152,6 +159,9 @@ private struct Show: ParsableCommand {
     @Option(help: "Only show reminders whose title or notes contain this text (case-insensitive)")
     var search: String?
 
+    @Option(help: "Only show completed reminders completed on or after this date")
+    var completedSince: DateComponents?
+
     @Option(
         name: .shortAndLong,
         help: "format, either of 'plain' or 'json'")
@@ -169,6 +179,10 @@ private struct Show: ParsableCommand {
             throw ValidationError(
                 "Cannot combine --no-due-date with --due-date, --due-before, --due-after, --overdue, or --include-overdue")
         }
+        if self.completedSince != nil && !self.onlyCompleted && !self.includeCompleted {
+            throw ValidationError(
+                "--completed-since requires --only-completed or --include-completed")
+        }
     }
 
     func run() {
@@ -183,6 +197,7 @@ private struct Show: ParsableCommand {
             withNameOrId: self.listNameOrId, dueOn: self.dueDate, includeOverdue: self.includeOverdue,
             overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
             noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
+            completedSince: self.completedSince,
             displayOptions: displayOptions, outputFormat: format, sort: sort, sortOrder: sortOrder)
     }
 }

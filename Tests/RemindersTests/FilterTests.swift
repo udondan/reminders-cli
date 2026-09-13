@@ -12,7 +12,8 @@ final class FilterTests: XCTestCase {
     }
 
     private func makeReminder(
-        title: String = "Test", notes: String? = nil, due: Date? = nil, priority: Priority = .none
+        title: String = "Test", notes: String? = nil, due: Date? = nil, priority: Priority = .none,
+        completed: Date? = nil
     ) -> EKReminder {
         let reminder = EKReminder(eventStore: store)
         let calendar = EKCalendar(for: .reminder, eventStore: store)
@@ -25,6 +26,10 @@ final class FilterTests: XCTestCase {
             reminder.dueDateComponents = Calendar.current.dateComponents(
                 [.year, .month, .day, .hour, .minute, .second], from: due)
         }
+        if let completed {
+            reminder.isCompleted = true
+            reminder.completionDate = completed
+        }
         return reminder
     }
 
@@ -36,11 +41,12 @@ final class FilterTests: XCTestCase {
         dueAfter: Date? = nil,
         noDueDate: Bool = false,
         priorities: [Priority] = [],
-        search: String? = nil
+        search: String? = nil,
+        completedSince: Date? = nil
     ) -> Bool {
         matchesAdditionalFilters(
             reminder, now: now, overdue: overdue, dueBefore: dueBefore, dueAfter: dueAfter,
-            noDueDate: noDueDate, priorities: priorities, search: search)
+            noDueDate: noDueDate, priorities: priorities, search: search, completedSince: completedSince)
     }
 
     func testNoFiltersMatchesEverything() throws {
@@ -93,6 +99,23 @@ final class FilterTests: XCTestCase {
         let cutoff = wholeSecond()
         XCTAssertFalse(matches(makeReminder(), dueBefore: cutoff))
         XCTAssertFalse(matches(makeReminder(), dueAfter: cutoff))
+    }
+
+    func testCompletedSinceIncludesExactBoundary() throws {
+        let cutoff = wholeSecond()
+        let reminder = makeReminder(completed: cutoff)
+        XCTAssertTrue(matches(reminder, completedSince: cutoff))
+    }
+
+    func testCompletedSinceRejectsBeforeBoundary() throws {
+        let cutoff = wholeSecond()
+        let reminder = makeReminder(completed: cutoff.addingTimeInterval(-1))
+        XCTAssertFalse(matches(reminder, completedSince: cutoff))
+    }
+
+    func testCompletedSinceRejectsIncompleteReminder() throws {
+        let cutoff = wholeSecond()
+        XCTAssertFalse(matches(makeReminder(), completedSince: cutoff))
     }
 
     func testNoDueDateMatchesReminderWithoutDueDate() throws {
