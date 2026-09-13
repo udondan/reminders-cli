@@ -11,8 +11,13 @@ private struct ShowLists: ParsableCommand {
         help: "format, either of 'plain' or 'json'")
     var format: OutputFormat = .plain
 
+    @Flag(
+        name: .shortAndLong,
+        help: "show only the default Reminders list")
+    var defaultOnly: Bool = false
+
     func run() {
-        reminders.showLists(outputFormat: format)
+        reminders.showLists(outputFormat: format, defaultOnly: defaultOnly)
     }
 }
 
