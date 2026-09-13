@@ -38,7 +38,7 @@ extension EKReminder: @retroactive Encodable {
         // url field is nil
         // https://developer.apple.com/forums/thread/128140
         try container.encodeIfPresent(self.url, forKey: .url)
-        try container.encodeIfPresent(format(self.completionDate), forKey: .completionDate)
+        try container.encode(format(self.completionDate), forKey: .completionDate)
 
         for alarm in self.alarms ?? [] {
             if let location = alarm.structuredLocation {

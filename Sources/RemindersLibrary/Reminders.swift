@@ -63,9 +63,10 @@ private func format(_ reminder: EKReminder, at index: Int?, listName: String? = 
 
 // Additional, independently-composable filters for `show`/`show-all`, ANDed together and ANDed
 // with the pre-existing day-granularity `--due-date`/`--include-overdue` filter. `now`,
-// `dueBefore`, and `dueAfter` are resolved to concrete `Date`s once per command invocation by
-// the caller, not per reminder. Kept internal (not private) so it's directly unit-testable via
-// `@testable import`, matching `recurrenceEndDate`/`nextOccurrence` elsewhere in this file.
+// `dueBefore`, `dueAfter`, and `completedSince` are resolved to concrete `Date`s once per command
+// invocation by the caller, not per reminder. Kept internal (not private) so it's directly
+// unit-testable via `@testable import`, matching `recurrenceEndDate`/`nextOccurrence` elsewhere in
+// this file.
 func matchesAdditionalFilters(
     _ reminder: EKReminder,
     now: Date,
@@ -74,7 +75,8 @@ func matchesAdditionalFilters(
     dueAfter: Date?,
     noDueDate: Bool,
     priorities: [Priority],
-    search: String?
+    search: String?,
+    completedSince: Date? = nil
 ) -> Bool {
     let reminderDueDate = reminder.dueDateComponents?.date
 
@@ -88,6 +90,9 @@ func matchesAdditionalFilters(
         return false
     }
     if let dueAfter, !(reminderDueDate.map { $0 >= dueAfter } ?? false) {
+        return false
+    }
+    if let completedSince, !(reminder.completionDate.map { $0 >= completedSince } ?? false) {
         return false
     }
     if !priorities.isEmpty {
@@ -479,7 +484,7 @@ public final class Reminders {
         dueOn dueDate: DateComponents?, includeOverdue: Bool,
         overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
         noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
-        lists: [String] = [],
+        lists: [String] = [], completedSince: DateComponents? = nil,
         displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder
     ) {
         let semaphore = DispatchSemaphore(value: 0)
@@ -490,6 +495,7 @@ public final class Reminders {
         // lower bound.
         let dueBeforeDate = dueBefore.flatMap { recurrenceEndDate(from: $0) }
         let dueAfterDate = dueAfter?.date
+        let completedSinceDate = completedSince?.date
         // Resolving --list up front means an unknown list name or ID hard-errors via
         // calendar(withNameOrId:)'s existing exit(1) before any reminders are fetched.
         let calendars = lists.isEmpty ? self.getCalendars() : lists.map { self.calendar(withNameOrId: $0) }
@@ -520,7 +526,8 @@ public final class Reminders {
 
                 guard matchesAdditionalFilters(
                     reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
-                    dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search
+                    dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search,
+                    completedSince: completedSinceDate
                 ) else {
                     continue
                 }
@@ -547,6 +554,7 @@ public final class Reminders {
         withNameOrId nameOrId: String, dueOn dueDate: DateComponents?, includeOverdue: Bool,
         overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
         noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
+        completedSince: DateComponents? = nil,
         displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder)
     {
         let reminderCalendar = self.calendar(withNameOrId: nameOrId)
@@ -555,6 +563,7 @@ public final class Reminders {
         let now = Date()
         let dueBeforeDate = dueBefore.flatMap { recurrenceEndDate(from: $0) }
         let dueAfterDate = dueAfter?.date
+        let completedSinceDate = completedSince?.date
 
         self.reminders(on: [reminderCalendar], displayOptions: displayOptions) { reminders in
             var matchingReminders = [(EKReminder, Int?)]()
@@ -581,7 +590,8 @@ public final class Reminders {
 
                 guard matchesAdditionalFilters(
                     reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
-                    dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search
+                    dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search,
+                    completedSince: completedSinceDate
                 ) else {
                     continue
                 }
