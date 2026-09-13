@@ -1,0 +1,14 @@
+{
+  "name": "reminders-cli",
+  "displayName": "Reminders CLI",
+  "version": "3.1.1",
+  "description": "Read, add, edit, complete and delete macOS Reminders from the command line.",
+  "author": {
+    "name": "udondan",
+    "url": "https://github.com/udondan"
+  },
+  "homepage": "https://github.com/udondan/reminders-cli",
+  "repository": "https://github.com/udondan/reminders-cli",
+  "license": "MIT",
+  "keywords": ["reminders", "macos", "eventkit", "cli"]
+}

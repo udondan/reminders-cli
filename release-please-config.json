@@ -13,6 +13,11 @@
     {
       "type": "generic",
       "path": "Sources/RemindersLibrary/Version.swift"
+    },
+    {
+      "type": "json",
+      "path": ".claude-plugin/plugin.json",
+      "jsonpath": "$.version"
     }
   ],
   "packages": {
