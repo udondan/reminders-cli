@@ -194,6 +194,8 @@ $ reminders show-all --search groceries
 $ reminders show-all --list Soon --list Work
 0: Ship reminders-cli (2 days ago)
 1: Contribute to open source (in 3 hours)
+$ reminders show-all --include-completed --completed-since monday
+5: Write README
 ```
 
 `--priority` and `--list` may be repeated to match any of several values. `--list` restricts which
@@ -203,7 +205,10 @@ date without a time includes the whole local day for `--due-before` (matching th
 behavior above), while `--due-after` uses the parsed date's own start as an inclusive lower bound.
 `--overdue` is independent of, and combinable with, `--due-date`/`--include-overdue`. `--no-due-date`
 cannot be combined with `--due-date`, `--due-before`, `--due-after`, `--overdue`, or
-`--include-overdue`, since those all require a due date to compare against.
+`--include-overdue`, since those all require a due date to compare against. `--completed-since`
+accepts the same natural-language dates as `--due-date`/`--due-after`, uses an inclusive lower
+bound against each reminder's completion time, and requires `--only-completed` or
+`--include-completed`, since there's nothing to filter otherwise.
 
 #### Sort reminders
 
