@@ -15,6 +15,17 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
-      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
           token: ${{ secrets.OVERRIDE_TOKEN }}
+
+      - name: Auto-merge release PR
+        if: steps.release.outputs.prs_created == 'true'
+        run: |
+          echo "${PRS}" | jq -r '.[].number' | while read -r pr; do
+            gh pr merge "$pr" --squash --auto --repo "${GITHUB_REPOSITORY}"
+          done
+        env:
+          GH_TOKEN: ${{ secrets.OVERRIDE_TOKEN }}
+          PRS: ${{ steps.release.outputs.prs }}
