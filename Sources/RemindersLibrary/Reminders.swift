@@ -106,6 +106,19 @@ func matchesAdditionalFilters(
     return true
 }
 
+// Resolves a list argument that may be either a `calendarIdentifier` or a (case-insensitive)
+// list title. ID matches take precedence, so a title that happens to collide with another
+// list's ID still resolves to the list with that ID. Kept as a free function, separate from
+// `Reminders.calendar(withNameOrId:)`, so it's directly unit-testable via `@testable import`
+// without needing live access to Reminders.app, matching `matchesAdditionalFilters` above.
+func calendarMatching(_ calendars: [EKCalendar], nameOrId: String) -> EKCalendar? {
+    if let calendar = calendars.first(where: { $0.calendarIdentifier == nameOrId }) {
+        return calendar
+    } else {
+        return calendars.first { $0.title.lowercased() == nameOrId.lowercased() }
+    }
+}
+
 public enum OutputFormat: String, ExpressibleByArgument {
     case json, plain
 }
@@ -451,12 +464,13 @@ public final class Reminders {
     }
 
     func showLists(outputFormat: OutputFormat) {
+        let calendars = self.getCalendars()
         switch (outputFormat) {
         case .json:
-            print(encodeToJson(data: self.getListNames()))
+            print(encodeToJson(data: calendars))
         default:
-            for name in self.getListNames() {
-                print(name)
+            for calendar in calendars {
+                print("\(calendar.title) (\(calendar.calendarIdentifier))")
             }
         }
     }
@@ -476,9 +490,9 @@ public final class Reminders {
         // lower bound.
         let dueBeforeDate = dueBefore.flatMap { recurrenceEndDate(from: $0) }
         let dueAfterDate = dueAfter?.date
-        // Resolving --list up front means an unknown list name hard-errors via
-        // calendar(withName:)'s existing exit(1) before any reminders are fetched.
-        let calendars = lists.isEmpty ? self.getCalendars() : lists.map { self.calendar(withName: $0) }
+        // Resolving --list up front means an unknown list name or ID hard-errors via
+        // calendar(withNameOrId:)'s existing exit(1) before any reminders are fetched.
+        let calendars = lists.isEmpty ? self.getCalendars() : lists.map { self.calendar(withNameOrId: $0) }
 
         self.reminders(on: calendars, displayOptions: displayOptions) { reminders in
             var matchingReminders = [(EKReminder, Int, String)]()
@@ -528,18 +542,19 @@ public final class Reminders {
     }
 
     func showListItems(
-        withName name: String, dueOn dueDate: DateComponents?, includeOverdue: Bool,
+        withNameOrId nameOrId: String, dueOn dueDate: DateComponents?, includeOverdue: Bool,
         overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
         noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
         displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder)
     {
+        let reminderCalendar = self.calendar(withNameOrId: nameOrId)
         let semaphore = DispatchSemaphore(value: 0)
         let calendar = Calendar.current
         let now = Date()
         let dueBeforeDate = dueBefore.flatMap { recurrenceEndDate(from: $0) }
         let dueAfterDate = dueAfter?.date
 
-        self.reminders(on: [self.calendar(withName: name)], displayOptions: displayOptions) { reminders in
+        self.reminders(on: [reminderCalendar], displayOptions: displayOptions) { reminders in
             var matchingReminders = [(EKReminder, Int?)]()
             let reminders = sort == .none ? reminders : reminders.sorted(by: sort.sortFunction(order: sortOrder))
             for (i, reminder) in reminders.enumerated() {
@@ -629,8 +644,8 @@ public final class Reminders {
     }
 
     func edit(
-        itemAtIndex index: String,
-        onListNamed name: String,
+        itemAtIndexOrId indexOrId: String,
+        onListNamedOrId nameOrId: String,
         newText: String?,
         newNotes: String?,
         newDueDateComponents: DateComponents? = nil,
@@ -641,9 +656,10 @@ public final class Reminders {
         newRecurrence: Recurrence?, newRecurrenceInterval: Int?,
         newRecurrenceEndDate: DateComponents?,
         clearRecurrenceEnd: Bool,
-        clearRecurrence: Bool)
+        clearRecurrence: Bool,
+        outputFormat: OutputFormat)
     {
-        let calendar = self.calendar(withName: name)
+        let calendar = self.calendar(withNameOrId: nameOrId)
         let semaphore = DispatchSemaphore(value: 0)
         let dueDateChangeRequested = clearDueDate || newDueDateComponents != nil
         let recurrenceChangeRequested = clearRecurrence || newRecurrence != nil
@@ -651,8 +667,8 @@ public final class Reminders {
             || clearRecurrenceEnd
 
         self.reminders(on: [calendar], displayOptions: .incomplete) { reminders in
-            guard let reminder = self.getReminder(from: reminders, at: index) else {
-                print("No reminder at index \(index) on \(name)")
+            guard let reminder = self.getReminder(from: reminders, atIndexOrId: indexOrId) else {
+                print("No reminder at index or with ID \(indexOrId) on \(nameOrId)")
                 exit(1)
             }
 
@@ -666,7 +682,7 @@ public final class Reminders {
                 }
 
                 if let newListName {
-                    reminder.calendar = self.calendar(withName: newListName)
+                    reminder.calendar = self.calendar(withNameOrId: newListName)
                 }
 
                 if clearDueDate {
@@ -734,7 +750,12 @@ public final class Reminders {
                         rules: reminder.recurrenceRules ?? [])
                 }
                 try Store.save(reminder, commit: true)
-                print("Updated reminder '\(reminder.title!)'")
+                switch outputFormat {
+                case .json:
+                    print(encodeToJson(data: reminder))
+                case .plain:
+                    print("Updated reminder '\(reminder.title!)'")
+                }
             } catch let error {
                 print("Failed to update reminder with error: \(error.localizedDescription)")
                 exit(1)
@@ -742,40 +763,41 @@ public final class Reminders {
 
             semaphore.signal()
         }
-
         semaphore.wait()
     }
 
-    func setComplete(_ complete: Bool, itemAtIndex index: String, onListNamed name: String) {
-        let calendar = self.calendar(withName: name)
+    func setComplete(_ complete: Bool, itemAtIndexOrId indexOrId: String, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) {
+        let calendar = self.calendar(withNameOrId: nameOrId)
         let semaphore = DispatchSemaphore(value: 0)
-        let displayOptions = complete ? DisplayOptions.incomplete : .complete
         let action = complete ? "Completed" : "Uncompleted"
 
-        self.reminders(on: [calendar], displayOptions: displayOptions) { reminders in
-            print(reminders.map { $0.title! })
-            guard let reminder = self.getReminder(from: reminders, at: index) else {
-                print("No reminder at index \(index) on \(name)")
+        self.reminders(on: [calendar], displayOptions: complete ? .incomplete : .complete) { reminders in
+            guard let reminder = self.getReminder(from: reminders, atIndexOrId: indexOrId) else {
+                print("No reminder at index or with ID \(indexOrId) on \(nameOrId)")
                 exit(1)
             }
 
             do {
                 reminder.isCompleted = complete
                 try Store.save(reminder, commit: true)
-                print("\(action) '\(reminder.title!)'")
+                switch outputFormat {
+                case .json:
+                    print(encodeToJson(data: reminder))
+                case .plain:
+                    print("\(action) '\(reminder.title!)'")
+                }
             } catch let error {
-                print("Failed to save reminder with error: \(error)")
+                print("Failed to update reminder with error: \(error)")
                 exit(1)
             }
 
             semaphore.signal()
         }
-
         semaphore.wait()
     }
 
-    func delete(itemAtIndex index: String, onListNamed name: String) {
-        let calendar = self.calendar(withName: name)
+    func delete(itemAtIndexOrId indexOrId: String, onListNamedOrId nameOrId: String) {
+        let calendar = self.calendar(withNameOrId: nameOrId)
         let semaphore = DispatchSemaphore(value: 0)
 
         // Numeric indexes are only meaningful against the same display set that
@@ -786,11 +808,11 @@ public final class Reminders {
         // completion state, so widen the fetch to `.all` in that case, so a
         // reminder already marked complete can still be found and deleted by
         // its id instead of failing with "No reminder at index ...".
-        let displayOptions: DisplayOptions = Int(index) == nil ? .all : .incomplete
+        let displayOptions: DisplayOptions = Int(indexOrId) == nil ? .all : .incomplete
 
         self.reminders(on: [calendar], displayOptions: displayOptions) { reminders in
-            guard let reminder = self.getReminder(from: reminders, at: index) else {
-                print("No reminder at index \(index) on \(name)")
+            guard let reminder = self.getReminder(from: reminders, atIndexOrId: indexOrId) else {
+                print("No reminder at index or with ID \(indexOrId) on \(nameOrId)")
                 exit(1)
             }
 
@@ -811,7 +833,7 @@ public final class Reminders {
     func addReminder(
         string: String,
         notes: String?,
-        toListNamed name: String,
+        toListNameOrId nameOrId: String,
         dueDateComponents: DateComponents?,
         priority: Priority,
         recurrence: Recurrence?,
@@ -819,39 +841,29 @@ public final class Reminders {
         recurrenceEndDate: DateComponents?,
         outputFormat: OutputFormat)
     {
-        let calendar = self.calendar(withName: name)
+        let calendar = self.calendar(withNameOrId: nameOrId)
         let reminder = EKReminder(eventStore: Store)
         reminder.calendar = calendar
         reminder.title = string
         reminder.notes = notes
         reminder.dueDateComponents = dueDateComponents
         reminder.priority = Int(priority.value.rawValue)
-        if let dueDate = dueDateComponents?.date, dueDateComponents?.hour != nil {
-            reminder.addAlarm(EKAlarm(absoluteDate: dueDate))
-        }
-        do {
-            if let recurrence = recurrence {
-                guard dueDateComponents != nil else {
-                    throw RecurrenceUpdateError.missingDueDate
-                }
-                let end = try recurrenceEnd(dateComponents: recurrenceEndDate)
-                reminder.addRecurrenceRule(
-                    recurrence.recurrenceRule(interval: recurrenceInterval, end: end))
+        if let dueDate = dueDateComponents, dueDate.hour != nil {
+            if let absoluteDate = dueDate.date {
+                reminder.addAlarm(EKAlarm(absoluteDate: absoluteDate))
             }
+        }
 
-            try validateRecurrenceSchedule(
-                dueDateComponents: reminder.dueDateComponents,
-                rules: reminder.recurrenceRules ?? [])
-
+        do {
             try Store.save(reminder, commit: true)
-            switch (outputFormat) {
+            switch outputFormat {
             case .json:
                 print(encodeToJson(data: reminder))
-            default:
-                print("Added '\(reminder.title!)' to '\(calendar.title)'")
+            case .plain:
+                print("Added reminder '\(reminder.title!)' to list '\(calendar.title)'")
             }
         } catch let error {
-            print("Failed to save reminder with error: \(error.localizedDescription)")
+            print("Failed to add reminder with error: \(error)")
             exit(1)
         }
     }
@@ -882,11 +894,11 @@ public final class Reminders {
         }
     }
 
-    private func calendar(withName name: String) -> EKCalendar {
-        if let calendar = self.getCalendars().find(where: { $0.title.lowercased() == name.lowercased() }) {
+    private func calendar(withNameOrId nameOrId: String) -> EKCalendar {
+        if let calendar = calendarMatching(self.getCalendars(), nameOrId: nameOrId) {
             return calendar
         } else {
-            print("No reminders list matching \(name)")
+            print("No reminders list matching \(nameOrId)")
             exit(1)
         }
     }
@@ -896,12 +908,13 @@ public final class Reminders {
                     .filter { $0.allowsContentModifications }
     }
 
-    private func getReminder(from reminders: [EKReminder], at index: String) -> EKReminder? {
-        precondition(!index.isEmpty, "Index cannot be empty, argument parser must be misconfigured")
-        if let index = Int(index) {
+    // Kept internal (not private) so it's directly unit-testable via `@testable import`,
+    // matching `matchesAdditionalFilters` above.
+    func getReminder(from reminders: [EKReminder], atIndexOrId indexOrId: String) -> EKReminder? {
+        if let index = Int(indexOrId) {
             return reminders[safe: index]
         } else {
-            return reminders.first { $0.calendarItemExternalIdentifier == index }
+            return reminders.first { $0.calendarItemExternalIdentifier == indexOrId }
         }
     }
 
@@ -913,3 +926,4 @@ private func encodeToJson(data: Encodable) -> String {
     let encoded = try! encoder.encode(data)
     return String(data: encoded, encoding: .utf8) ?? ""
 }
+
