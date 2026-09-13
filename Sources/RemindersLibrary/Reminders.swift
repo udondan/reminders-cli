@@ -141,8 +141,36 @@ func calendarMatching(_ calendars: [EKCalendar], nameOrId: String) -> EKCalendar
     }
 }
 
+/// `calendarMatching` with the "not found" case turned into the error every command reports.
+func resolveCalendar(_ calendars: [EKCalendar], nameOrId: String) throws -> EKCalendar {
+    guard let calendar = calendarMatching(calendars, nameOrId: nameOrId) else {
+        throw CLIError.listNotFound(nameOrId)
+    }
+    return calendar
+}
+
 public enum OutputFormat: String, ExpressibleByArgument {
     case json, plain
+
+    /// Best-effort detection of `--format` from raw argv, for the one error that has to be
+    /// reported before ArgumentParser has parsed anything: the Reminders access check in
+    /// `main.swift`. Recognises `--format X`, `--format=X`, and `-f X`; stops at `--` since
+    /// everything after it is positional text. Anything unrecognised means plain.
+    public static func detect(in arguments: [String]) -> OutputFormat {
+        var iterator = arguments.makeIterator()
+        while let argument = iterator.next() {
+            if argument == "--" {
+                break
+            }
+            if argument == "--format" || argument == "-f" {
+                return iterator.next().flatMap(OutputFormat.init(rawValue:)) ?? .plain
+            }
+            if argument.hasPrefix("--format=") {
+                return OutputFormat(rawValue: String(argument.dropFirst("--format=".count))) ?? .plain
+            }
+        }
+        return .plain
+    }
 }
 
 public enum DisplayOptions: String, Decodable {
@@ -226,17 +254,6 @@ enum RecurrenceUpdateError: LocalizedError {
             return "The repeat end date cannot be earlier than the reminder's due date"
         case .failedToCopyExistingRule:
             return "The existing repeat rule could not be copied safely"
-        }
-    }
-}
-
-enum PostponeError: LocalizedError {
-    case missingDueDate
-
-    var errorDescription: String? {
-        switch self {
-        case .missingDueDate:
-            return "--next-weekday requires the reminder to already have a due date"
         }
     }
 }
@@ -524,12 +541,11 @@ public final class Reminders {
         return Store.defaultCalendarForNewReminders()
     }
 
-    func showLists(outputFormat: OutputFormat, defaultOnly: Bool = false) {
+    func showLists(outputFormat: OutputFormat, defaultOnly: Bool = false) throws {
         let calendars: [EKCalendar]
         if defaultOnly {
             guard let defaultCalendar = self.getDefaultList() else {
-                print("No default reminders list is configured")
-                exit(1)
+                throw CLIError.noDefaultList()
             }
             calendars = [defaultCalendar]
         } else {
@@ -551,8 +567,7 @@ public final class Reminders {
         noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
         lists: [String] = [], completedSince: DateComponents? = nil,
         displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder
-    ) {
-        let semaphore = DispatchSemaphore(value: 0)
+    ) throws {
         let calendar = Calendar.current
         let now = Date()
         // Date-only means the whole local day, same rule as --repeat-until; --due-after needs no
@@ -561,58 +576,53 @@ public final class Reminders {
         let dueBeforeDate = dueBefore.flatMap { recurrenceEndDate(from: $0) }
         let dueAfterDate = dueAfter?.date
         let completedSinceDate = completedSince?.date
-        // Resolving --list up front means an unknown list name or ID hard-errors via
-        // calendar(withNameOrId:)'s existing exit(1) before any reminders are fetched.
-        let calendars = lists.isEmpty ? self.getCalendars() : lists.map { self.calendar(withNameOrId: $0) }
+        // Resolving --list up front means an unknown list name or ID fails with `list_not_found`
+        // before any reminders are fetched.
+        let calendars = lists.isEmpty ? self.getCalendars() : try lists.map { try self.calendar(withNameOrId: $0) }
 
-        self.reminders(on: calendars, displayOptions: displayOptions) { reminders in
-            var matchingReminders = [(EKReminder, String, String)]()
-            let reminders = sort == .none ? reminders : reminders.sorted(by: sort.sortFunction(order: sortOrder))
-            for reminder in reminders {
-                let id = reminder.calendarItemExternalIdentifier ?? "<unknown-id>"
-                let listName = reminder.calendar.title
+        let fetched = self.fetchReminders(on: calendars, displayOptions: displayOptions)
+        var matchingReminders = [(EKReminder, String, String)]()
+        let reminders = sort == .none ? fetched : fetched.sorted(by: sort.sortFunction(order: sortOrder))
+        for reminder in reminders {
+            let id = reminder.calendarItemExternalIdentifier ?? "<unknown-id>"
+            let listName = reminder.calendar.title
 
-                let matchesExistingDueDateFilter: Bool
-                if let dueDate = dueDate?.date {
-                    guard let reminderDueDate = reminder.dueDateComponents?.date else {
-                        continue
-                    }
-                    let sameDay = calendar.compare(
-                        reminderDueDate, to: dueDate, toGranularity: .day) == .orderedSame
-                    let earlierDay = calendar.compare(
-                        reminderDueDate, to: dueDate, toGranularity: .day) == .orderedAscending
-                    matchesExistingDueDateFilter = sameDay || (includeOverdue && earlierDay)
-                } else {
-                    matchesExistingDueDateFilter = true
-                }
-                guard matchesExistingDueDateFilter else {
+            let matchesExistingDueDateFilter: Bool
+            if let dueDate = dueDate?.date {
+                guard let reminderDueDate = reminder.dueDateComponents?.date else {
                     continue
                 }
-
-                guard matchesAdditionalFilters(
-                    reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
-                    dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search,
-                    completedSince: completedSinceDate
-                ) else {
-                    continue
-                }
-
-                matchingReminders.append((reminder, id, listName))
+                let sameDay = calendar.compare(
+                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedSame
+                let earlierDay = calendar.compare(
+                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedAscending
+                matchesExistingDueDateFilter = sameDay || (includeOverdue && earlierDay)
+            } else {
+                matchesExistingDueDateFilter = true
+            }
+            guard matchesExistingDueDateFilter else {
+                continue
             }
 
-            switch outputFormat {
-            case .json:
-                print(encodeToJson(data: matchingReminders.map { $0.0 }))
-            case .plain:
-                for (reminder, id, listName) in matchingReminders {
-                    print(format(reminder, id: id, listName: listName))
-                }
+            guard matchesAdditionalFilters(
+                reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
+                dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search,
+                completedSince: completedSinceDate
+            ) else {
+                continue
             }
 
-            semaphore.signal()
+            matchingReminders.append((reminder, id, listName))
         }
 
-        semaphore.wait()
+        switch outputFormat {
+        case .json:
+            print(encodeToJson(data: matchingReminders.map { $0.0 }))
+        case .plain:
+            for (reminder, id, listName) in matchingReminders {
+                print(format(reminder, id: id, listName: listName))
+            }
+        }
     }
 
     func showListItems(
@@ -621,65 +631,60 @@ public final class Reminders {
         noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
         completedSince: DateComponents? = nil,
         displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder)
+        throws
     {
-        let reminderCalendar = self.calendar(withNameOrId: nameOrId)
-        let semaphore = DispatchSemaphore(value: 0)
+        let reminderCalendar = try self.calendar(withNameOrId: nameOrId)
         let calendar = Calendar.current
         let now = Date()
         let dueBeforeDate = dueBefore.flatMap { recurrenceEndDate(from: $0) }
         let dueAfterDate = dueAfter?.date
         let completedSinceDate = completedSince?.date
 
-        self.reminders(on: [reminderCalendar], displayOptions: displayOptions) { reminders in
-            var matchingReminders = [(EKReminder, String)]()
-            let reminders = sort == .none ? reminders : reminders.sorted(by: sort.sortFunction(order: sortOrder))
-            for reminder in reminders {
-                let id = reminder.calendarItemExternalIdentifier ?? "<unknown-id>"
+        let fetched = self.fetchReminders(on: [reminderCalendar], displayOptions: displayOptions)
+        var matchingReminders = [(EKReminder, String)]()
+        let reminders = sort == .none ? fetched : fetched.sorted(by: sort.sortFunction(order: sortOrder))
+        for reminder in reminders {
+            let id = reminder.calendarItemExternalIdentifier ?? "<unknown-id>"
 
-                let matchesExistingDueDateFilter: Bool
-                if let dueDate = dueDate?.date {
-                    guard let reminderDueDate = reminder.dueDateComponents?.date else {
-                        continue
-                    }
-                    let sameDay = calendar.compare(
-                        reminderDueDate, to: dueDate, toGranularity: .day) == .orderedSame
-                    let earlierDay = calendar.compare(
-                        reminderDueDate, to: dueDate, toGranularity: .day) == .orderedAscending
-                    matchesExistingDueDateFilter = sameDay || (includeOverdue && earlierDay)
-                } else {
-                    matchesExistingDueDateFilter = true
-                }
-                guard matchesExistingDueDateFilter else {
+            let matchesExistingDueDateFilter: Bool
+            if let dueDate = dueDate?.date {
+                guard let reminderDueDate = reminder.dueDateComponents?.date else {
                     continue
                 }
-
-                guard matchesAdditionalFilters(
-                    reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
-                    dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search,
-                    completedSince: completedSinceDate
-                ) else {
-                    continue
-                }
-
-                matchingReminders.append((reminder, id))
+                let sameDay = calendar.compare(
+                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedSame
+                let earlierDay = calendar.compare(
+                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedAscending
+                matchesExistingDueDateFilter = sameDay || (includeOverdue && earlierDay)
+            } else {
+                matchesExistingDueDateFilter = true
+            }
+            guard matchesExistingDueDateFilter else {
+                continue
             }
 
-            switch outputFormat {
-            case .json:
-                print(encodeToJson(data: matchingReminders.map { $0.0 }))
-            case .plain:
-                for (reminder, id) in matchingReminders {
-                    print(format(reminder, id: id))
-                }
+            guard matchesAdditionalFilters(
+                reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
+                dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search,
+                completedSince: completedSinceDate
+            ) else {
+                continue
             }
 
-            semaphore.signal()
+            matchingReminders.append((reminder, id))
         }
 
-        semaphore.wait()
+        switch outputFormat {
+        case .json:
+            print(encodeToJson(data: matchingReminders.map { $0.0 }))
+        case .plain:
+            for (reminder, id) in matchingReminders {
+                print(format(reminder, id: id))
+            }
+        }
     }
 
-    func newList(with name: String, source requestedSourceName: String?) {
+    func newList(with name: String, source requestedSourceName: String?, outputFormat: OutputFormat) throws {
         let store = EKEventStore()
         // EventKit can expose several sources with the same title (e.g. an iCloud calendar
         // account next to the iCloud reminders account). Only the ones that already hold
@@ -697,18 +702,11 @@ public final class Reminders {
         case .chosen(let index):
             source = store.sources[index]
         case .noSources:
-            print("No existing list sources were found, please create a list in Reminders.app")
-            exit(1)
+            throw CLIError.noSources()
         case .notFound(let requested):
-            print("No source named '\(requested)' holds reminder lists")
-            exit(1)
+            throw CLIError.sourceNotFound(requested)
         case .ambiguous(let titles):
-            print("Multiple sources were found, please specify one with --source:")
-            for title in titles {
-                print("  \(title)")
-            }
-
-            exit(1)
+            throw CLIError.sourceAmbiguous(titles)
         }
 
         let newList = EKCalendar(for: .reminder, eventStore: store)
@@ -717,10 +715,14 @@ public final class Reminders {
 
         do {
             try store.saveCalendar(newList, commit: true)
-            print("Created new list '\(newList.title)'!")
         } catch let error {
-            print("Failed create new list with error: \(error)")
-            exit(1)
+            throw CLIError.saveFailed(action: "create list '\(name)'", underlying: error)
+        }
+        switch outputFormat {
+        case .json:
+            print(encodeToJson(data: newList))
+        case .plain:
+            print("Created new list '\(newList.title)'!")
         }
     }
 
@@ -739,117 +741,111 @@ public final class Reminders {
         newRecurrenceEndDate: DateComponents?,
         clearRecurrenceEnd: Bool,
         clearRecurrence: Bool,
-        outputFormat: OutputFormat)
+        outputFormat: OutputFormat) throws
     {
-        let calendar = self.calendar(withNameOrId: nameOrId)
-        let semaphore = DispatchSemaphore(value: 0)
+        let calendar = try self.calendar(withNameOrId: nameOrId)
         let dueDateChangeRequested = clearDueDate || newDueDateComponents != nil
         let recurrenceChangeRequested = clearRecurrence || newRecurrence != nil
             || newRecurrenceInterval != nil || newRecurrenceEndDate != nil
             || clearRecurrenceEnd
 
-        self.reminders(on: [calendar], displayOptions: .incomplete) { reminders in
-            guard let reminder = self.getReminder(from: reminders, withId: id) else {
-                print("No reminder with ID \(id) on \(nameOrId)")
-                exit(1)
+        let reminder = try self.reminder(
+            withId: id,
+            in: self.fetchReminders(on: [calendar], displayOptions: .incomplete),
+            onList: nameOrId)
+
+        reminder.title = newText ?? reminder.title
+        if clearNotes {
+            reminder.notes = nil
+        } else {
+            reminder.notes = newNotes ?? reminder.notes
+        }
+        if clearPriority {
+            reminder.priority = Int(EKReminderPriority.none.rawValue)
+        } else if let priority {
+            reminder.priority = Int(priority.value.rawValue)
+        }
+
+        if let newListName {
+            reminder.calendar = try self.calendar(withNameOrId: newListName)
+        }
+
+        if clearDueDate {
+            reminder.dueDateComponents = nil
+            for alarm in reminder.alarms ?? [] {
+                reminder.removeAlarm(alarm)
+            }
+        } else if let newDueDateComponents {
+            reminder.dueDateComponents = newDueDateComponents
+            for alarm in reminder.alarms ?? [] {
+                reminder.removeAlarm(alarm)
             }
 
-            do {
-                reminder.title = newText ?? reminder.title
-                if clearNotes {
-                    reminder.notes = nil
+            if let dueDate = newDueDateComponents.date, newDueDateComponents.hour != nil {
+                reminder.addAlarm(EKAlarm(absoluteDate: dueDate))
+            }
+        }
+
+        do {
+            if clearRecurrence {
+                for rule in reminder.recurrenceRules ?? [] {
+                    reminder.removeRecurrenceRule(rule)
+                }
+            } else {
+                let endUpdate: RecurrenceEndUpdate
+                if clearRecurrenceEnd {
+                    endUpdate = .clear
+                } else if let newRecurrenceEndDate {
+                    guard let date = recurrenceEndDate(from: newRecurrenceEndDate) else {
+                        throw RecurrenceUpdateError.invalidEndDate
+                    }
+                    endUpdate = .date(date)
                 } else {
-                    reminder.notes = newNotes ?? reminder.notes
-                }
-                if clearPriority {
-                    reminder.priority = Int(EKReminderPriority.none.rawValue)
-                } else if let priority {
-                    reminder.priority = Int(priority.value.rawValue)
+                    endUpdate = .unchanged
                 }
 
-                if let newListName {
-                    reminder.calendar = self.calendar(withNameOrId: newListName)
-                }
-
-                if clearDueDate {
-                    reminder.dueDateComponents = nil
-                    for alarm in reminder.alarms ?? [] {
-                        reminder.removeAlarm(alarm)
-                    }
-                } else if let newDueDateComponents {
-                    reminder.dueDateComponents = newDueDateComponents
-                    for alarm in reminder.alarms ?? [] {
-                        reminder.removeAlarm(alarm)
+                let update = RecurrenceUpdate(
+                    recurrence: newRecurrence,
+                    interval: newRecurrenceInterval,
+                    end: endUpdate)
+                if update.isRequested {
+                    let existingRules = reminder.recurrenceRules ?? []
+                    let replacements: [EKRecurrenceRule]
+                    if newRecurrence == nil {
+                        guard !existingRules.isEmpty else {
+                            throw RecurrenceUpdateError.missingExistingRule
+                        }
+                        replacements = try existingRules.map {
+                            try update.rule(replacing: $0)
+                        }
+                    } else {
+                        replacements = [try update.rule(replacing: existingRules.first)]
                     }
 
-                    if let dueDate = newDueDateComponents.date, newDueDateComponents.hour != nil {
-                        reminder.addAlarm(EKAlarm(absoluteDate: dueDate))
-                    }
-                }
-
-                if clearRecurrence {
-                    for rule in reminder.recurrenceRules ?? [] {
+                    for rule in existingRules {
                         reminder.removeRecurrenceRule(rule)
                     }
-                } else {
-                    let endUpdate: RecurrenceEndUpdate
-                    if clearRecurrenceEnd {
-                        endUpdate = .clear
-                    } else if let newRecurrenceEndDate {
-                        guard let date = recurrenceEndDate(from: newRecurrenceEndDate) else {
-                            throw RecurrenceUpdateError.invalidEndDate
-                        }
-                        endUpdate = .date(date)
-                    } else {
-                        endUpdate = .unchanged
-                    }
-
-                    let update = RecurrenceUpdate(
-                        recurrence: newRecurrence,
-                        interval: newRecurrenceInterval,
-                        end: endUpdate)
-                    if update.isRequested {
-                        let existingRules = reminder.recurrenceRules ?? []
-                        let replacements: [EKRecurrenceRule]
-                        if newRecurrence == nil {
-                            guard !existingRules.isEmpty else {
-                                throw RecurrenceUpdateError.missingExistingRule
-                            }
-                            replacements = try existingRules.map {
-                                try update.rule(replacing: $0)
-                            }
-                        } else {
-                            replacements = [try update.rule(replacing: existingRules.first)]
-                        }
-
-                        for rule in existingRules {
-                            reminder.removeRecurrenceRule(rule)
-                        }
-                        for replacement in replacements {
-                            reminder.addRecurrenceRule(replacement)
-                        }
+                    for replacement in replacements {
+                        reminder.addRecurrenceRule(replacement)
                     }
                 }
-                if dueDateChangeRequested || recurrenceChangeRequested {
-                    try validateRecurrenceSchedule(
-                        dueDateComponents: reminder.dueDateComponents,
-                        rules: reminder.recurrenceRules ?? [])
-                }
-                try Store.save(reminder, commit: true)
-                switch outputFormat {
-                case .json:
-                    print(encodeToJson(data: reminder))
-                case .plain:
-                    print("Updated reminder '\(reminder.title!)'")
-                }
-            } catch let error {
-                print("Failed to update reminder with error: \(error.localizedDescription)")
-                exit(1)
             }
-
-            semaphore.signal()
+            if dueDateChangeRequested || recurrenceChangeRequested {
+                try validateRecurrenceSchedule(
+                    dueDateComponents: reminder.dueDateComponents,
+                    rules: reminder.recurrenceRules ?? [])
+            }
+        } catch let error as RecurrenceUpdateError {
+            throw CLIError.invalidArgument(error.localizedDescription)
         }
-        semaphore.wait()
+
+        try self.save(reminder, action: "update reminder")
+        switch outputFormat {
+        case .json:
+            print(encodeToJson(data: reminder))
+        case .plain:
+            print("Updated reminder '\(reminder.title!)'")
+        }
     }
 
     func postpone(
@@ -857,117 +853,97 @@ public final class Reminders {
         onListNamedOrId nameOrId: String,
         to newDueDateComponents: DateComponents?,
         toNextWeekday: Bool,
-        outputFormat: OutputFormat)
+        outputFormat: OutputFormat) throws
     {
-        let calendar = self.calendar(withNameOrId: nameOrId)
-        let semaphore = DispatchSemaphore(value: 0)
+        let calendar = try self.calendar(withNameOrId: nameOrId)
+        let reminder = try self.reminder(
+            withId: id,
+            in: self.fetchReminders(on: [calendar], displayOptions: .incomplete),
+            onList: nameOrId)
 
-        self.reminders(on: [calendar], displayOptions: .incomplete) { reminders in
-            guard let reminder = self.getReminder(from: reminders, withId: id) else {
-                print("No reminder with ID \(id) on \(nameOrId)")
-                exit(1)
+        let resolvedComponents: DateComponents
+        if toNextWeekday {
+            guard let currentDue = reminder.dueDateComponents,
+                let shifted = nextWeekday(after: currentDue)
+            else {
+                throw CLIError.noDueDate()
             }
-
-            do {
-                let resolvedComponents: DateComponents
-                if toNextWeekday {
-                    guard let currentDue = reminder.dueDateComponents,
-                        let shifted = nextWeekday(after: currentDue)
-                    else {
-                        throw PostponeError.missingDueDate
-                    }
-                    resolvedComponents = shifted
-                } else if let newDueDateComponents {
-                    resolvedComponents = newDueDateComponents
-                } else {
-                    fatalError("postpone requires either a new due date or --next-weekday")
-                }
-
-                // recurrenceRules is never read or written here, so any
-                // existing repeat rule passes through completely unchanged.
-                reminder.dueDateComponents = resolvedComponents
-                for alarm in reminder.alarms ?? [] {
-                    reminder.removeAlarm(alarm)
-                }
-                if let date = resolvedComponents.date, resolvedComponents.hour != nil {
-                    reminder.addAlarm(EKAlarm(absoluteDate: date))
-                }
-
-                try validateRecurrenceSchedule(
-                    dueDateComponents: reminder.dueDateComponents,
-                    rules: reminder.recurrenceRules ?? [])
-
-                try Store.save(reminder, commit: true)
-                switch outputFormat {
-                case .json:
-                    print(encodeToJson(data: reminder))
-                case .plain:
-                    print("Postponed reminder '\(reminder.title!)'")
-                }
-            } catch let error {
-                print("Failed to postpone reminder with error: \(error.localizedDescription)")
-                exit(1)
-            }
-
-            semaphore.signal()
+            resolvedComponents = shifted
+        } else if let newDueDateComponents {
+            resolvedComponents = newDueDateComponents
+        } else {
+            fatalError("postpone requires either a new due date or --next-weekday")
         }
-        semaphore.wait()
+
+        // recurrenceRules is never read or written here, so any
+        // existing repeat rule passes through completely unchanged.
+        reminder.dueDateComponents = resolvedComponents
+        for alarm in reminder.alarms ?? [] {
+            reminder.removeAlarm(alarm)
+        }
+        if let date = resolvedComponents.date, resolvedComponents.hour != nil {
+            reminder.addAlarm(EKAlarm(absoluteDate: date))
+        }
+
+        do {
+            try validateRecurrenceSchedule(
+                dueDateComponents: reminder.dueDateComponents,
+                rules: reminder.recurrenceRules ?? [])
+        } catch let error as RecurrenceUpdateError {
+            throw CLIError.invalidArgument(error.localizedDescription)
+        }
+
+        try self.save(reminder, action: "postpone reminder")
+        switch outputFormat {
+        case .json:
+            print(encodeToJson(data: reminder))
+        case .plain:
+            print("Postponed reminder '\(reminder.title!)'")
+        }
     }
 
-    func setComplete(_ complete: Bool, itemAtId id: String, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) {
-        let calendar = self.calendar(withNameOrId: nameOrId)
-        let semaphore = DispatchSemaphore(value: 0)
-        let action = complete ? "Completed" : "Uncompleted"
+    func setComplete(_ complete: Bool, itemAtId id: String, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) throws {
+        let calendar = try self.calendar(withNameOrId: nameOrId)
+        let reminder = try self.reminder(
+            withId: id,
+            in: self.fetchReminders(on: [calendar], displayOptions: complete ? .incomplete : .complete),
+            onList: nameOrId)
 
-        self.reminders(on: [calendar], displayOptions: complete ? .incomplete : .complete) { reminders in
-            guard let reminder = self.getReminder(from: reminders, withId: id) else {
-                print("No reminder with ID \(id) on \(nameOrId)")
-                exit(1)
-            }
-
-            do {
-                reminder.isCompleted = complete
-                try Store.save(reminder, commit: true)
-                switch outputFormat {
-                case .json:
-                    print(encodeToJson(data: reminder))
-                case .plain:
-                    print("\(action) '\(reminder.title!)'")
-                }
-            } catch let error {
-                print("Failed to update reminder with error: \(error)")
-                exit(1)
-            }
-
-            semaphore.signal()
+        reminder.isCompleted = complete
+        try self.save(reminder, action: complete ? "complete reminder" : "uncomplete reminder")
+        switch outputFormat {
+        case .json:
+            print(encodeToJson(data: reminder))
+        case .plain:
+            print("\(complete ? "Completed" : "Uncompleted") '\(reminder.title!)'")
         }
-        semaphore.wait()
     }
 
-    func delete(itemAtId id: String, onListNamedOrId nameOrId: String) {
-        let calendar = self.calendar(withNameOrId: nameOrId)
-        let semaphore = DispatchSemaphore(value: 0)
-
+    func delete(itemAtId id: String, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) throws {
+        let calendar = try self.calendar(withNameOrId: nameOrId)
         // External identifiers are stable regardless of completion state, so a
         // reminder already marked complete can still be found and deleted by its id.
-        self.reminders(on: [calendar], displayOptions: .all) { reminders in
-            guard let reminder = self.getReminder(from: reminders, withId: id) else {
-                print("No reminder with ID \(id) on \(nameOrId)")
-                exit(1)
-            }
+        let reminder = try self.reminder(
+            withId: id,
+            in: self.fetchReminders(on: [calendar], displayOptions: .all),
+            onList: nameOrId)
 
-            do {
-                try Store.remove(reminder, commit: true)
-                print("Deleted '\(reminder.title!)'")
-            } catch let error {
-                print("Failed to delete reminder with error: \(error)")
-                exit(1)
-            }
-
-            semaphore.signal()
+        // Encode before removing: the encoder reads `reminder.calendar`, which is
+        // no longer meaningful once the reminder is gone from the store.
+        let confirmation: String
+        switch outputFormat {
+        case .json:
+            confirmation = encodeToJson(data: reminder)
+        case .plain:
+            confirmation = "Deleted '\(reminder.title!)'"
         }
 
-        semaphore.wait()
+        do {
+            try Store.remove(reminder, commit: true)
+        } catch let error {
+            throw CLIError.saveFailed(action: "delete reminder", underlying: error)
+        }
+        print(confirmation)
     }
 
     func addReminder(
@@ -979,9 +955,9 @@ public final class Reminders {
         recurrence: Recurrence?,
         recurrenceInterval: Int,
         recurrenceEndDate: DateComponents?,
-        outputFormat: OutputFormat)
+        outputFormat: OutputFormat) throws
     {
-        let calendar = self.calendar(withNameOrId: nameOrId)
+        let calendar = try self.calendar(withNameOrId: nameOrId)
         let reminder = EKReminder(eventStore: Store)
         reminder.calendar = calendar
         reminder.title = string
@@ -994,32 +970,38 @@ public final class Reminders {
             }
         }
 
-        do {
-            try Store.save(reminder, commit: true)
-            switch outputFormat {
-            case .json:
-                print(encodeToJson(data: reminder))
-            case .plain:
-                print("Added reminder '\(reminder.title!)' to list '\(calendar.title)'")
-            }
-        } catch let error {
-            print("Failed to add reminder with error: \(error)")
-            exit(1)
+        try self.save(reminder, action: "add reminder")
+        switch outputFormat {
+        case .json:
+            print(encodeToJson(data: reminder))
+        case .plain:
+            print("Added reminder '\(reminder.title!)' to list '\(calendar.title)'")
         }
     }
 
     // MARK: - Private functions
 
-    private func reminders(
-        on calendars: [EKCalendar],
-        displayOptions: DisplayOptions,
-        completion: @escaping (_ reminders: [EKReminder]) -> Void)
-    {
+    /// EventKit only offers a callback-based fetch; block on it once here so every command
+    /// can be written as straight-line code that simply throws on failure (nothing can be
+    /// thrown from inside EventKit's completion closure).
+    private func fetchReminders(on calendars: [EKCalendar], displayOptions: DisplayOptions) -> [EKReminder] {
+        let semaphore = DispatchSemaphore(value: 0)
+        var fetched: [EKReminder] = []
         let predicate = Store.predicateForReminders(in: calendars)
         Store.fetchReminders(matching: predicate) { reminders in
-            let reminders = reminders?
-                .filter { self.shouldDisplay(reminder: $0, displayOptions: displayOptions) }
-            completion(reminders ?? [])
+            fetched = reminders?
+                .filter { self.shouldDisplay(reminder: $0, displayOptions: displayOptions) } ?? []
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return fetched
+    }
+
+    private func save(_ reminder: EKReminder, action: String) throws {
+        do {
+            try Store.save(reminder, commit: true)
+        } catch let error {
+            throw CLIError.saveFailed(action: action, underlying: error)
         }
     }
 
@@ -1034,13 +1016,10 @@ public final class Reminders {
         }
     }
 
-    private func calendar(withNameOrId nameOrId: String) -> EKCalendar {
-        if let calendar = calendarMatching(self.getCalendars(), nameOrId: nameOrId) {
-            return calendar
-        } else {
-            print("No reminders list matching \(nameOrId)")
-            exit(1)
-        }
+    // Kept internal (not private) so the `list_not_found` path is directly unit-testable via
+    // `@testable import`, matching `matchesAdditionalFilters` above.
+    func calendar(withNameOrId nameOrId: String) throws -> EKCalendar {
+        return try resolveCalendar(self.getCalendars(), nameOrId: nameOrId)
     }
 
     private func getCalendars() -> [EKCalendar] {
@@ -1052,6 +1031,14 @@ public final class Reminders {
     // matching `matchesAdditionalFilters` above.
     func getReminder(from reminders: [EKReminder], withId id: String) -> EKReminder? {
         return reminders.first { $0.calendarItemExternalIdentifier == id }
+    }
+
+    /// `getReminder` with the "not found" case turned into the error every command reports.
+    func reminder(withId id: String, in reminders: [EKReminder], onList nameOrId: String) throws -> EKReminder {
+        guard let reminder = self.getReminder(from: reminders, withId: id) else {
+            throw CLIError.reminderNotFound(id: id, listNameOrId: nameOrId)
+        }
+        return reminder
     }
 
 }

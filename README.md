@@ -48,8 +48,9 @@ $ reminders show Soon
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 ```
 
-`complete`, `uncomplete`, and `edit` also accept `--format json` to print the affected reminder as
-JSON instead of the plain-text confirmation shown above.
+`complete`, `uncomplete`, `edit`, `postpone`, and `delete` also accept `--format json` to print the
+affected reminder as JSON instead of the plain-text confirmation shown above, and `new-list
+--format json` prints the created list. Errors are never printed to stdout; see [Errors](#errors).
 
 ### Undo a completed item
 
@@ -148,6 +149,21 @@ $ reminders show Soon
 
 `delete` looks a reminder up by ID regardless of its completion state, so a reminder that's already
 been completed can be deleted the same way, without any special-casing.
+
+With `--format json` the deleted reminder is printed as JSON, so a script can keep a record of
+what it removed:
+
+```console
+$ reminders delete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --format json
+{
+  "externalId" : "2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C",
+  "isCompleted" : false,
+  "list" : "Soon",
+  "listId" : "9E1F1D3B-9C63-4B2E-A7F2-5C1B7E1E8A44",
+  "priority" : 0,
+  "title" : "Write README"
+}
+```
 
 ### Add a reminder to a list
 
@@ -319,6 +335,51 @@ reminders --help
 
 reminders show -h
 ```
+
+## Errors
+
+Errors are always written to **stderr**, never to stdout, so `reminders ... --format json | jq`
+only ever sees JSON on stdout. Every error carries a stable, machine-readable code and its own
+exit status, so scripts can branch on `$?` or on the code without parsing English text.
+
+Without `--format json`, an error is one or two human-readable lines:
+
+```console
+$ reminders show Grocery
+Error: No reminders list matching 'Grocery'
+Suggestion: Run 'reminders show-lists' to see available lists and their IDs
+$ echo $?
+2
+```
+
+With `--format json`, the same error is a single JSON object on stderr. The `suggestion` key is
+omitted when there is nothing to suggest:
+
+```console
+$ reminders show Grocery --format json
+{"error":{"code":"list_not_found","message":"No reminders list matching 'Grocery'","suggestion":"Run 'reminders show-lists' to see available lists and their IDs"}}
+```
+
+The codes and exit statuses are a stable contract; the `message` and `suggestion` text may change
+between releases.
+
+| Exit status | Code                 | Meaning                                                              |
+| ----------- | -------------------- | -------------------------------------------------------------------- |
+| `2`         | `list_not_found`     | No list matches the given name or ID, or there is no default list    |
+| `3`         | `list_ambiguous`     | Reserved for fuzzy list matching; not produced yet                   |
+| `4`         | `reminder_not_found` | No reminder with the given ID on the given list                      |
+| `5`         | `reminder_ambiguous` | Reserved for ID prefix matching; not produced yet                    |
+| `6`         | `no_due_date`        | `postpone --next-weekday` on a reminder without a due date           |
+| `7`         | `no_sources`         | `new-list` found no account that can hold reminder lists             |
+| `8`         | `source_not_found`   | `new-list --source` named an account that has no reminder lists      |
+| `9`         | `source_ambiguous`   | `new-list` without `--source` when several accounts hold lists       |
+| `10`        | `save_failed`        | EventKit refused to save or delete                                   |
+| `11`        | `access_denied`      | Reminders access was not granted to the terminal                     |
+| `12`        | `invalid_argument`   | Arguments are invalid for this reminder, e.g. a repeat ending early  |
+
+Exit status `1` is reserved for unexpected errors that don't fit any code. Usage errors (missing
+arguments, unknown flags, values that can't be parsed) are reported by the argument parser in its
+own format and exit with `64`.
 
 ## Installation
 

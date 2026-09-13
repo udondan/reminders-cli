@@ -6,14 +6,14 @@ let arguments = Array(CommandLine.arguments.dropFirst())
 if AccessRequirement.requiresReminderAccess(arguments: arguments) {
     switch Reminders.requestAccess() {
     case (true, _):
-        CLI.main()
-    case (false, let error):
-        print("error: you need to grant reminders access")
-        if let error {
-            print("error: \(error.localizedDescription)")
-        }
-        exit(1)
+        CLI.execute()
+    case (false, let underlying):
+        // This runs before ArgumentParser has parsed anything, so `--format` is detected
+        // from the raw arguments to keep the error machine-readable under `--format json`.
+        let error = CLIError.accessDenied(underlying: underlying)
+        error.report(format: OutputFormat.detect(in: arguments))
+        exit(error.exitCode.rawValue)
     }
 } else {
-    CLI.main()
+    CLI.execute()
 }
