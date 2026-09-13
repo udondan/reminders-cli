@@ -1,0 +1,73 @@
+---
+name: Publish
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: xcode-select
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Package
+        run: make package
+
+      - name: Checksum
+        id: checksum
+        run: echo "sha256=$(shasum -a 256 reminders.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Attach artifact to release
+        if: github.event_name == 'release'
+        run: gh release upload "${{ github.event.release.tag_name }}" reminders.tar.gz
+        env:
+          GH_TOKEN: ${{ secrets.OVERRIDE_TOKEN }}
+
+      - name: Checkout homebrew tap
+        if: github.event_name == 'release'
+        uses: actions/checkout@v7
+        with:
+          repository: udondan/homebrew-software
+          token: ${{ secrets.OVERRIDE_TOKEN }}
+          path: homebrew-software
+
+      - name: Update homebrew formula
+        if: github.event_name == 'release'
+        working-directory: homebrew-software
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          SHA256="${{ steps.checksum.outputs.sha256 }}"
+
+          echo "${TEMPLATE}" | sed \
+            -e "s!{{ version }}!${VERSION#v}!g" \
+            -e "s!{{ sha256 }}!${SHA256}!g" \
+            > reminders-cli.rb
+          cat reminders-cli.rb
+
+          git config --global user.email "${EMAIL}"
+          git config --global user.name "udondan"
+          git add reminders-cli.rb
+          git commit -m "Release ${VERSION#v}"
+          git push
+        env:
+          EMAIL: ${{ secrets.EMAIL }}
+          TEMPLATE: |
+            class RemindersCli < Formula
+              desc "Interact with macOS Reminders from the command line"
+              homepage "https://github.com/udondan/reminders-cli"
+              version "{{ version }}"
+              license "MIT"
+              url "https://github.com/udondan/reminders-cli/releases/download/v{{ version }}/reminders.tar.gz"
+              sha256 "{{ sha256 }}"
+
+              def install
+                bin.install "reminders"
+                generate_completions_from_executable(bin/"reminders", "--generate-completion-script")
+              end
+            end

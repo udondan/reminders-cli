@@ -309,13 +309,13 @@ $ reminders show -h
 ### With [Homebrew](http://brew.sh/)
 
 ```console
-$ brew install keith/formulae/reminders-cli
+$ brew install udondan/software/reminders-cli
 ```
 
 ### From GitHub releases
 
 Download the latest release from
-[here](https://github.com/keith/reminders-cli/releases)
+[here](https://github.com/udondan/reminders-cli/releases)
 
 ```console
 $ tar -zxvf reminders.tar.gz
