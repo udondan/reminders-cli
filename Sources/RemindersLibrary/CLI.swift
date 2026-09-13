@@ -289,6 +289,12 @@ private struct Edit: ParsableCommand {
     var clearPriority = false
 
     @Option(
+        name: .long,
+        help: "Move the reminder to a different list, see 'show-lists' for names",
+        completion: .custom(listNameCompletion))
+    var list: String?
+
+    @Option(
         name: .shortAndLong,
         help: "The notes to set on the reminder, overwriting previous notes")
     var notes: String?
@@ -344,11 +350,11 @@ private struct Edit: ParsableCommand {
 
         if self.reminder.isEmpty && self.notes == nil && self.dueDate == nil
             && !self.clearDueDate && !changesRecurrence && !self.clearRepeat
-            && self.priority == nil && !self.clearPriority
+            && self.priority == nil && !self.clearPriority && self.list == nil
         {
             throw ValidationError(
                 "Must specify new reminder content, new notes, a due date change, a repeat change, "
-                    + "or a priority change")
+                    + "a priority change, or a new list")
         }
         if self.clearRepeat && changesRecurrence {
             throw ValidationError("Cannot combine --clear-repeat with another repeat option")
@@ -381,6 +387,7 @@ private struct Edit: ParsableCommand {
             clearDueDate: self.clearDueDate,
             priority: self.priority,
             clearPriority: self.clearPriority,
+            newListName: self.list,
             newRecurrence: self.repeat_,
             newRecurrenceInterval: self.repeatInterval,
             newRecurrenceEndDate: self.repeatUntil,
