@@ -502,8 +502,21 @@ public final class Reminders {
         return self.getCalendars().map { $0.title }
     }
 
-    func showLists(outputFormat: OutputFormat) {
-        let calendars = self.getCalendars()
+    func getDefaultList() -> EKCalendar? {
+        return Store.defaultCalendarForNewReminders()
+    }
+
+    func showLists(outputFormat: OutputFormat, defaultOnly: Bool = false) {
+        let calendars: [EKCalendar]
+        if defaultOnly {
+            guard let defaultCalendar = self.getDefaultList() else {
+                print("No default reminders list is configured")
+                exit(1)
+            }
+            calendars = [defaultCalendar]
+        } else {
+            calendars = self.getCalendars()
+        }
         switch (outputFormat) {
         case .json:
             print(encodeToJson(data: calendars))
