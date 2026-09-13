@@ -205,6 +205,36 @@ behavior above), while `--due-after` uses the parsed date's own start as an incl
 cannot be combined with `--due-date`, `--due-before`, `--due-after`, `--overdue`, or
 `--include-overdue`, since those all require a due date to compare against.
 
+#### Sort reminders
+
+`show` and `show-all` support `--sort`, one of `none` (default), `creation-date`, `due-date`, or
+`priority`, and `--sort-order`, one of `ascending` (default) or `descending`. Note that whenever
+`--sort` is anything other than `none`, the leading index normally used with `complete`/`edit`/
+`delete` is omitted from plain output, since it no longer reflects each reminder's position in its
+list:
+
+```
+$ reminders show-all --sort due-date
+Soon: Contribute to open source (in 3 hours)
+Work: Renew passport (in 2 weeks)
+Eventually: Read a book
+$ reminders show-all --sort priority
+Soon: Ship reminders-cli (priority: high)
+Work: Prepare slides (priority: medium)
+Eventually: Read a book (priority: low)
+Soon: Contribute to open source (in 3 hours)
+$ reminders show-all --sort priority --sort-order descending
+Soon: Contribute to open source (in 3 hours)
+Eventually: Read a book (priority: low)
+Work: Prepare slides (priority: medium)
+Soon: Ship reminders-cli (priority: high)
+```
+
+`--sort priority` orders high before medium before low before no-priority reminders in ascending
+order (reversed for `descending`); reminders tied on priority are always broken by due date
+ascending, regardless of `--sort-order`. `--sort due-date` always sorts reminders with no due date
+to the end, in both ascending and descending order.
+
 #### See help for more examples
 
 ```

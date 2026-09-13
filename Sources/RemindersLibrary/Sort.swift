@@ -5,6 +5,7 @@ public enum Sort: String, Decodable, ExpressibleByArgument, CaseIterable {
     case none
     case creationDate = "creation-date"
     case dueDate = "due-date"
+    case priority
 
     public static let commaSeparatedCases = Self.allCases.map { $0.rawValue }.joined(separator: ", ")
 
@@ -13,15 +14,41 @@ public enum Sort: String, Decodable, ExpressibleByArgument, CaseIterable {
         switch self {
             case .none: return { _, _ in fatalError() }
             case .creationDate: return { comparison($0.creationDate!, $1.creationDate!) }
-            case .dueDate: return {
-                switch ($0.dueDateComponents, $1.dueDateComponents) {
-                    case (.none, .none): return false
-                    case (.none, .some): return false
-                    case (.some, .none): return true
-                    case (.some, .some): return comparison($0.dueDateComponents!.date!, $1.dueDateComponents!.date!)
+            case .dueDate: return { dueDateComparison($0, $1, using: comparison) }
+            case .priority: return {
+                let rankA = priorityRank($0)
+                let rankB = priorityRank($1)
+                if rankA != rankB {
+                    return order == .ascending ? rankA < rankB : rankA > rankB
                 }
+                // Ties are always broken by due date ascending, regardless of --sort-order.
+                return dueDateComparison($0, $1, using: (<))
             }
         }
+    }
+}
+
+/// Ranks a reminder's priority for sorting: lower rank sorts first in ascending order.
+/// `Priority`'s declaration order doesn't match this ranking, so it's mapped explicitly here.
+private func priorityRank(_ reminder: EKReminder) -> Int {
+    switch Priority(reminder.mappedPriority) ?? .none {
+        case .high: return 0
+        case .medium: return 1
+        case .low: return 2
+        case .none: return 3
+    }
+}
+
+/// Compares due dates for sorting, with reminders that have no due date always sorted last,
+/// independent of `comparison`'s direction.
+private func dueDateComparison(
+    _ a: EKReminder, _ b: EKReminder, using comparison: (Date, Date) -> Bool
+) -> Bool {
+    switch (a.dueDateComponents, b.dueDateComponents) {
+        case (.none, .none): return false
+        case (.none, .some): return false
+        case (.some, .none): return true
+        case (.some, .some): return comparison(a.dueDateComponents!.date!, b.dueDateComponents!.date!)
     }
 }
 
