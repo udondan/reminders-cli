@@ -177,6 +177,7 @@ final class RecurrenceTests: XCTestCase {
         XCTAssertEqual(object["recurrenceInterval"] as? Int, 1)
         XCTAssertNotNil(object["recurrenceEnd"] as? String)
         XCTAssertNil(object["recurrenceCount"])
+        XCTAssertEqual(object["hasRecurrence"] as? Bool, true)
     }
 
     func testJSONIncludesCountEnd() throws {
@@ -195,6 +196,39 @@ final class RecurrenceTests: XCTestCase {
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         XCTAssertEqual(object["recurrenceCount"] as? Int, 7)
         XCTAssertNil(object["recurrenceEnd"])
+        XCTAssertEqual(object["hasRecurrence"] as? Bool, true)
+    }
+
+    func testJSONHasRecurrenceFalseWhenNotRecurring() throws {
+        let store = EKEventStore()
+        let reminder = EKReminder(eventStore: store)
+        let calendar = EKCalendar(for: .reminder, eventStore: store)
+        calendar.title = "Test"
+        reminder.calendar = calendar
+        reminder.title = "One-off"
+
+        let data = try JSONEncoder().encode(reminder)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(object["hasRecurrence"] as? Bool, false)
+        XCTAssertNil(object["recurrence"])
+        XCTAssertNil(object["nextDueDate"])
+    }
+
+    func testJSONIncludesNextDueDateForRecurringReminder() throws {
+        let store = EKEventStore()
+        let reminder = EKReminder(eventStore: store)
+        let calendar = EKCalendar(for: .reminder, eventStore: store)
+        calendar.title = "Test"
+        reminder.calendar = calendar
+        reminder.title = "Medicine"
+        reminder.dueDateComponents = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute],
+            from: Date(timeIntervalSince1970: 1_700_000_000))
+        reminder.addRecurrenceRule(Recurrence.daily.recurrenceRule(interval: 1, end: nil))
+
+        let data = try JSONEncoder().encode(reminder)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertNotNil(object["nextDueDate"] as? String)
     }
 
     func testAddRejectsExplicitIntervalWithoutRecurrence() throws {
@@ -301,5 +335,122 @@ final class RecurrenceTests: XCTestCase {
         XCTAssertEqual(Recurrence(argument: "yearly"), .yearly)
         XCTAssertEqual(Recurrence(argument: "hourly"), .hourly)
         XCTAssertNil(Recurrence(argument: "biweekly"))
+    }
+
+    // MARK: - nextOccurrence
+
+    private func utcDate(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0)
+        -> Date
+    {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        var components = DateComponents()
+        components.year = year
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        return calendar.date(from: components)!
+    }
+
+    func testNextOccurrenceDailyStepsForward() throws {
+        let anchor = utcDate(2026, 1, 1)
+        let rule = Recurrence.daily.recurrenceRule(interval: 1, end: nil)
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 3, 12))
+        XCTAssertEqual(next, utcDate(2026, 1, 4))
+    }
+
+    func testNextOccurrenceWeeklyStepsForward() throws {
+        let anchor = utcDate(2026, 1, 1)
+        let rule = Recurrence.weekly.recurrenceRule(interval: 1, end: nil)
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 11))
+        XCTAssertEqual(next, utcDate(2026, 1, 15))
+    }
+
+    func testNextOccurrenceMonthlyStepsForward() throws {
+        let anchor = utcDate(2026, 1, 15)
+        let rule = Recurrence.monthly.recurrenceRule(interval: 1, end: nil)
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 3, 1))
+        XCTAssertEqual(next, utcDate(2026, 3, 15))
+    }
+
+    func testNextOccurrenceYearlyStepsForward() throws {
+        let anchor = utcDate(2025, 6, 1)
+        let rule = Recurrence.yearly.recurrenceRule(interval: 1, end: nil)
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2027, 1, 1))
+        XCTAssertEqual(next, utcDate(2027, 6, 1))
+    }
+
+    func testNextOccurrenceHonorsIntervalGreaterThanOne() throws {
+        let anchor = utcDate(2026, 1, 1)
+        let rule = Recurrence.daily.recurrenceRule(interval: 3, end: nil)
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 5))
+        XCTAssertEqual(next, utcDate(2026, 1, 7))
+    }
+
+    func testNextOccurrenceReturnsAnchorWhenReferenceDateIsBeforeIt() throws {
+        let anchor = utcDate(2026, 1, 10)
+        let rule = Recurrence.daily.recurrenceRule(interval: 1, end: nil)
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 1))
+        XCTAssertEqual(next, anchor)
+    }
+
+    func testNextOccurrenceReturnsNilPastEndDate() throws {
+        let anchor = utcDate(2026, 1, 1)
+        let rule = Recurrence.daily.recurrenceRule(
+            interval: 1, end: EKRecurrenceEnd(end: utcDate(2026, 1, 3)))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 10))
+        XCTAssertNil(next)
+    }
+
+    func testNextOccurrenceReturnsLastOccurrenceWithinEndDate() throws {
+        let anchor = utcDate(2026, 1, 1)
+        let rule = Recurrence.daily.recurrenceRule(
+            interval: 1, end: EKRecurrenceEnd(end: utcDate(2026, 1, 5)))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 5))
+        XCTAssertEqual(next, utcDate(2026, 1, 5))
+    }
+
+    func testNextOccurrenceReturnsNilPastOccurrenceCount() throws {
+        let anchor = utcDate(2026, 1, 1)
+        let rule = Recurrence.daily.recurrenceRule(
+            interval: 1, end: EKRecurrenceEnd(occurrenceCount: 3))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 10))
+        XCTAssertNil(next)
+    }
+
+    func testNextOccurrenceReturnsThirdOccurrenceWithinCount() throws {
+        let anchor = utcDate(2026, 1, 1)
+        let rule = Recurrence.daily.recurrenceRule(
+            interval: 1, end: EKRecurrenceEnd(occurrenceCount: 3))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 3))
+        XCTAssertEqual(next, utcDate(2026, 1, 3))
+    }
+
+    func testNextOccurrenceReturnsNilForComplexSelectors() throws {
+        let anchor = utcDate(2026, 1, 1)
+        let rule = EKRecurrenceRule(
+            recurrenceWith: .monthly,
+            interval: 1,
+            daysOfTheWeek: [EKRecurrenceDayOfWeek(.friday, weekNumber: -1)],
+            daysOfTheMonth: nil,
+            monthsOfTheYear: nil,
+            weeksOfTheYear: nil,
+            daysOfTheYear: nil,
+            setPositions: nil,
+            end: nil)
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 3, 1))
+        XCTAssertNil(next)
+    }
+
+    func testNextDueDateReturnsNilWithoutRecurrenceRule() throws {
+        let store = EKEventStore()
+        let reminder = EKReminder(eventStore: store)
+        let calendar = EKCalendar(for: .reminder, eventStore: store)
+        calendar.title = "Test"
+        reminder.calendar = calendar
+        reminder.title = "One-off"
+
+        XCTAssertNil(nextDueDate(from: reminder))
     }
 }

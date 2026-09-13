@@ -106,7 +106,20 @@ selectors, such as "the last Friday of every month". Changing the frequency pres
 end condition but resets its interval to 1 unless `--repeat-interval` is supplied. An end-only edit
 copies the complete EventKit rule so provider-specific calendar metadata is preserved as well.
 JSON output includes `recurrence`, `recurrenceInterval`, and either `recurrenceEnd` or
-`recurrenceCount` (when an existing rule is count-based) for repeating reminders.
+`recurrenceCount` (when an existing rule is count-based) for repeating reminders, plus a `hasRecurrence`
+boolean on every reminder (so scripts can check it without testing for a missing or `null` field) and,
+where computable, a `nextDueDate`.
+
+Known behavior: EventKit does not advance a repeating reminder's due date as occurrences pass — once
+the due date is in the past, `dueDate`/`dueDateComponents` stay at whatever they were last set to
+(observed directly against Reminders.app; this isn't otherwise documented by Apple), and the
+reminder can end up showing arbitrarily overdue instead of jumping to the next occurrence. Use the
+`nextDueDate` JSON field if you need the next actionable occurrence instead: it's computed by this
+CLI by stepping the rule's frequency/interval forward from its due date, respecting `--repeat-until`/
+occurrence-count ends. It's only populated for the plain daily/weekly/monthly/yearly (+ interval)
+rules this CLI itself creates and edits; a rule with EventKit-native selectors such as "the last
+Friday of every month" (only reachable by editing a rule this CLI didn't create) omits the field
+rather than guess.
 
 #### Show reminders due on or by a date
 

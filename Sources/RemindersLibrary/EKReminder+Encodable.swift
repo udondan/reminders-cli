@@ -20,6 +20,8 @@ extension EKReminder: @retroactive Encodable {
         case recurrenceInterval
         case recurrenceEnd
         case recurrenceCount
+        case hasRecurrence
+        case nextDueDate
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -63,6 +65,8 @@ extension EKReminder: @retroactive Encodable {
             try container.encode(format(creationDate), forKey: .creationDate)
         }
 
+        try container.encode(self.recurrenceRules?.first != nil, forKey: .hasRecurrence)
+
         if let rule = self.recurrenceRules?.first {
             try container.encodeIfPresent(recurrenceName(for: rule.frequency), forKey: .recurrence)
             try container.encode(rule.interval, forKey: .recurrenceInterval)
@@ -70,6 +74,7 @@ extension EKReminder: @retroactive Encodable {
             if let count = rule.recurrenceEnd?.occurrenceCount, count > 0 {
                 try container.encode(count, forKey: .recurrenceCount)
             }
+            try container.encodeIfPresent(format(nextDueDate(from: self)), forKey: .nextDueDate)
         }
     }
 
