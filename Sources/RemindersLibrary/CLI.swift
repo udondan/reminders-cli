@@ -31,6 +31,16 @@ private struct ShowAll: ParsableCommand {
 
     @Option(
         name: .shortAndLong,
+        help: "Show the reminders in a specific order, one of: \(Sort.commaSeparatedCases)")
+    var sort: Sort = .none
+
+    @Option(
+        name: [.customShort("o"), .long],
+        help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
+    var sortOrder: CustomSortOrder = .ascending
+
+    @Option(
+        name: .shortAndLong,
         help: "Show only reminders due on this date")
     var dueDate: DateComponents?
 
@@ -87,7 +97,7 @@ private struct ShowAll: ParsableCommand {
             overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
             noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
             lists: self.list,
-            displayOptions: displayOptions, outputFormat: format)
+            displayOptions: displayOptions, outputFormat: format, sort: sort, sortOrder: sortOrder)
     }
 }
 

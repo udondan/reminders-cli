@@ -45,7 +45,7 @@ private func formattedRecurrence(from reminder: EKReminder) -> String? {
     return parts.joined(separator: ", ")
 }
 
-private extension EKReminder {
+extension EKReminder {
     var mappedPriority: EKReminderPriority {
         UInt(exactly: self.priority).flatMap(EKReminderPriority.init) ?? EKReminderPriority.none
     }
@@ -480,7 +480,7 @@ public final class Reminders {
         overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
         noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
         lists: [String] = [],
-        displayOptions: DisplayOptions, outputFormat: OutputFormat
+        displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder
     ) {
         let semaphore = DispatchSemaphore(value: 0)
         let calendar = Calendar.current
@@ -495,8 +495,10 @@ public final class Reminders {
         let calendars = lists.isEmpty ? self.getCalendars() : lists.map { self.calendar(withNameOrId: $0) }
 
         self.reminders(on: calendars, displayOptions: displayOptions) { reminders in
-            var matchingReminders = [(EKReminder, Int, String)]()
+            var matchingReminders = [(EKReminder, Int?, String)]()
+            let reminders = sort == .none ? reminders : reminders.sorted(by: sort.sortFunction(order: sortOrder))
             for (i, reminder) in reminders.enumerated() {
+                let index = sort == .none ? i : nil
                 let listName = reminder.calendar.title
 
                 let matchesExistingDueDateFilter: Bool
@@ -523,7 +525,7 @@ public final class Reminders {
                     continue
                 }
 
-                matchingReminders.append((reminder, i, listName))
+                matchingReminders.append((reminder, index, listName))
             }
 
             switch outputFormat {
