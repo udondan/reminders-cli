@@ -25,6 +25,25 @@ Every list also has a stable identifier, shown above in parentheses (and availab
 for scripting against a list whose name might change or contains characters that are awkward on the
 command line.
 
+For interactive use, the list argument doesn't have to be the exact name either. It's resolved by
+trying, in order: an exact ID, an exact name, a case-insensitive name, and finally a case-insensitive
+substring of a name. So `reminders show soon` and `reminders show even` both work with the lists
+above. Exact matches always win, so scripts that pass full names or IDs are unaffected. A fragment
+that matches several lists is an error, never a guess:
+
+```console
+$ reminders show-lists
+Work (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)
+Work – Side projects (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)
+$ reminders show wor
+Error: Multiple reminders lists match 'wor': Work, Work – Side projects
+Suggestion: Be more specific, or pass the list's ID from 'reminders show-lists'
+```
+
+(`reminders show work` does resolve to `Work`, because the whole-name match is tried before the
+substring match.) `new-list` always creates exactly the name you give it; no fuzzy matching applies
+there.
+
 ### Show reminders on a specific list
 
 ```console
@@ -37,6 +56,12 @@ Each reminder's own stable identifier is shown as the leading prefix — the sam
 list identifiers above. This is what you pass to `complete`, `uncomplete`, `edit`, `postpone`, and
 `delete` to act on a specific reminder; unlike a list position, it keeps pointing at the same
 reminder even if the list changes in between.
+
+You don't have to type the whole ID: a case-insensitive prefix of at least 4 characters is enough as
+long as it identifies exactly one reminder on the list, so `reminders complete Soon 44c1` completes
+"Ship reminders-cli" above. A prefix that matches several reminders is reported as
+`reminder_ambiguous` together with the matching IDs and titles, and a prefix shorter than 4
+characters never matches anything (an exact full ID always does).
 
 ### Complete an item on a list
 
@@ -365,10 +390,10 @@ between releases.
 
 | Exit status | Code                 | Meaning                                                              |
 | ----------- | -------------------- | -------------------------------------------------------------------- |
-| `2`         | `list_not_found`     | No list matches the given name or ID, or there is no default list    |
-| `3`         | `list_ambiguous`     | Reserved for fuzzy list matching; not produced yet                   |
-| `4`         | `reminder_not_found` | No reminder with the given ID on the given list                      |
-| `5`         | `reminder_ambiguous` | Reserved for ID prefix matching; not produced yet                    |
+| `2`         | `list_not_found`     | No list matches the name, fragment, or ID, or there is no default list |
+| `3`         | `list_ambiguous`     | A list name fragment is a substring of several list names            |
+| `4`         | `reminder_not_found` | No reminder with the given ID or ID prefix on the given list         |
+| `5`         | `reminder_ambiguous` | A reminder ID prefix matches several reminders on the list           |
 | `6`         | `no_due_date`        | `postpone --next-weekday` on a reminder without a due date           |
 | `7`         | `no_sources`         | `new-list` found no account that can hold reminder lists             |
 | `8`         | `source_not_found`   | `new-list --source` named an account that has no reminder lists      |

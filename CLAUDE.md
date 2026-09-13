@@ -34,7 +34,7 @@ Execution flows in one direction through four layers:
 
 When adding a new subcommand: add a `FormattedCommand` struct in `CLI.swift` (with a `--format` option so errors can be rendered as JSON), register it in `CLI`'s `subcommands`, and implement the actual behavior as a throwing method on `Reminders` in `Reminders.swift` — keep `CLI.swift` limited to argument parsing/dispatch, and report failures by throwing a `CLIError` rather than printing or exiting.
 
-Reminder items are looked up only by their stable `calendarItemExternalIdentifier` (never by list position) via `Reminders.getReminder(from:withId:)`, exercised directly in `Tests/RemindersTests/IdentifierTests.swift` (via `@testable import RemindersLibrary`) alongside `Tests/RemindersTests/NaturalLanguageTests.swift`'s natural-language date parsing tests.
+Reminder items are looked up only by their stable `calendarItemExternalIdentifier` (never by list position) via the free function `resolveReminder(_:idOrPrefix:onList:)` in `Reminders.swift`, which accepts the full ID or a case-insensitive prefix of at least `minimumIdPrefixLength` (4) characters and throws `reminder_ambiguous` when a prefix matches several reminders; the string matching itself is the EventKit-free `matchIdentifier(_:idOrPrefix:minimumPrefixLength:)` so ambiguity is testable. Lists are resolved the same way by `resolveCalendar(_:nameOrId:)` (exact ID → exact title → case-insensitive title → unique case-insensitive substring, else `list_ambiguous`/`list_not_found`). Both are exercised directly in `Tests/RemindersTests/IdentifierTests.swift` (via `@testable import RemindersLibrary`) alongside `Tests/RemindersTests/NaturalLanguageTests.swift`'s natural-language date parsing tests.
 
 ## Release process
 
