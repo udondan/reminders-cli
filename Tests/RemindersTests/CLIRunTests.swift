@@ -8,30 +8,45 @@ import XCTest
 ///
 /// `EKEventStore.calendars(for:)` returns an empty list when the process has no Reminders
 /// access and never prompts, so an unknown list is always "not found" here. A fresh UUID is used
-/// as the list name because a developer machine may well have granted the test runner access.
+/// as the list name because a developer machine may well have granted the test runner access;
+/// in that case the error's suggestion names the machine's real lists, so only the code and the
+/// message are asserted, not the whole error.
 final class CLIRunTests: XCTestCase {
+    private func assertListNotFound(
+        _ outcome: CLIRunOutcome, list: String, format: OutputFormat,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        guard case .failed(let error, let actualFormat) = outcome else {
+            XCTFail("expected a failure, got \(outcome)", file: file, line: line)
+            return
+        }
+        XCTAssertEqual(error.code, .listNotFound, file: file, line: line)
+        XCTAssertEqual(error.message, CLIError.listNotFound(list).message, file: file, line: line)
+        XCTAssertEqual(actualFormat, format, file: file, line: line)
+    }
+
     func testUnknownListIsReportedAsListNotFoundInPlainFormat() throws {
         let list = UUID().uuidString
         let outcome = try CLI.runCommand(["show", list])
-        XCTAssertEqual(outcome, .failed(.listNotFound(list), format: .plain))
+        assertListNotFound(outcome, list: list, format: .plain)
     }
 
     func testUnknownListIsReportedAsListNotFoundInJSONFormat() throws {
         let list = UUID().uuidString
         let outcome = try CLI.runCommand(["show", list, "--format", "json"])
-        XCTAssertEqual(outcome, .failed(.listNotFound(list), format: .json))
+        assertListNotFound(outcome, list: list, format: .json)
     }
 
     func testListNotFoundIsReportedBeforeReminderLookup() throws {
         let list = UUID().uuidString
         let outcome = try CLI.runCommand(["complete", list, "some-id", "-f", "json"])
-        XCTAssertEqual(outcome, .failed(.listNotFound(list), format: .json))
+        assertListNotFound(outcome, list: list, format: .json)
     }
 
     func testDeleteAcceptsFormatOption() throws {
         let list = UUID().uuidString
         let outcome = try CLI.runCommand(["delete", list, "some-id", "--format", "json"])
-        XCTAssertEqual(outcome, .failed(.listNotFound(list), format: .json))
+        assertListNotFound(outcome, list: list, format: .json)
     }
 
     func testValidationErrorsAreRethrownUnchanged() {

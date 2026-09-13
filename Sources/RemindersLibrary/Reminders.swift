@@ -128,25 +128,103 @@ func matchesAdditionalFilters(
     return true
 }
 
-// Resolves a list argument that may be either a `calendarIdentifier` or a (case-insensitive)
-// list title. ID matches take precedence, so a title that happens to collide with another
-// list's ID still resolves to the list with that ID. Kept as a free function, separate from
-// `Reminders.calendar(withNameOrId:)`, so it's directly unit-testable via `@testable import`
-// without needing live access to Reminders.app, matching `matchesAdditionalFilters` above.
-func calendarMatching(_ calendars: [EKCalendar], nameOrId: String) -> EKCalendar? {
+/// Resolves a list argument that may be a `calendarIdentifier` or (part of) a list title. The
+/// steps are tried in order and the first one that produces a hit wins, so exact input always
+/// behaves as it did before forgiving matching existed:
+///
+/// 1. exact `calendarIdentifier` (so a title that collides with another list's ID still loses)
+/// 2. exact title
+/// 3. case-insensitive title
+/// 4. case-insensitive substring of the title; exactly one hit resolves, several are reported as
+///    `list_ambiguous` rather than guessed
+///
+/// Empty or whitespace-only input skips step 4 (it would match every list). Nothing matching is
+/// `list_not_found`, with every available list name in the suggestion. Kept as a free function,
+/// separate from `Reminders.calendar(withNameOrId:)`, so it's directly unit-testable via
+/// `@testable import` without live access to Reminders.app, matching `matchesAdditionalFilters`.
+func resolveCalendar(_ calendars: [EKCalendar], nameOrId: String) throws -> EKCalendar {
     if let calendar = calendars.first(where: { $0.calendarIdentifier == nameOrId }) {
         return calendar
-    } else {
-        return calendars.first { $0.title.lowercased() == nameOrId.lowercased() }
+    }
+    if let calendar = calendars.first(where: { $0.title == nameOrId }) {
+        return calendar
+    }
+    if let calendar = calendars.first(where: { $0.title.lowercased() == nameOrId.lowercased() }) {
+        return calendar
+    }
+    if !nameOrId.trimmingCharacters(in: .whitespaces).isEmpty {
+        let candidates = calendars.filter { $0.title.localizedCaseInsensitiveContains(nameOrId) }
+        if candidates.count == 1 {
+            return candidates[0]
+        }
+        if candidates.count > 1 {
+            throw CLIError.listAmbiguous(nameOrId, matches: candidates.map { $0.title })
+        }
+    }
+    throw CLIError.listNotFound(nameOrId, available: calendars.map { $0.title })
+}
+
+/// The shortest ID prefix that's accepted in place of a full reminder ID. Anything shorter only
+/// matches exactly, so a stray one- or two-character argument can't act on the wrong reminder.
+let minimumIdPrefixLength = 4
+
+enum IdentifierMatch: Equatable {
+    /// Index into the IDs array of the single match.
+    case found(Int)
+    /// Indices of every ID the prefix matched.
+    case ambiguous([Int])
+    case notFound
+}
+
+/// Matches an ID argument against a set of identifiers: an exact match always wins, otherwise a
+/// case-insensitive prefix of at least `minimumPrefixLength` characters. Works on plain strings so
+/// the ambiguity handling is unit-testable; `calendarItemExternalIdentifier` can't be set on a
+/// test `EKReminder`.
+func matchIdentifier(
+    _ ids: [String], idOrPrefix: String, minimumPrefixLength: Int = minimumIdPrefixLength
+) -> IdentifierMatch {
+    if let index = ids.firstIndex(of: idOrPrefix) {
+        return .found(index)
+    }
+    guard idOrPrefix.count >= minimumPrefixLength else {
+        return .notFound
+    }
+    let matches = ids.indices.filter {
+        ids[$0].range(of: idOrPrefix, options: [.caseInsensitive, .anchored]) != nil
+    }
+    switch matches.count {
+    case 0: return .notFound
+    case 1: return .found(matches[0])
+    default: return .ambiguous(matches)
     }
 }
 
-/// `calendarMatching` with the "not found" case turned into the error every command reports.
-func resolveCalendar(_ calendars: [EKCalendar], nameOrId: String) throws -> EKCalendar {
-    guard let calendar = calendarMatching(calendars, nameOrId: nameOrId) else {
-        throw CLIError.listNotFound(nameOrId)
+/// `matchIdentifier` with the two failure cases turned into the errors every command reports;
+/// returns the index of the one match. `titles` is parallel to `ids` and only used to make the
+/// ambiguity message readable. Also string-based so the error rendering is unit-testable.
+func resolveIdentifier(
+    _ ids: [String], titles: [String], idOrPrefix: String, onList nameOrId: String
+) throws -> Int {
+    switch matchIdentifier(ids, idOrPrefix: idOrPrefix) {
+    case .found(let index):
+        return index
+    case .ambiguous(let indices):
+        let matches = indices.map { "\(ids[$0]) (\(titles[$0]))" }
+        throw CLIError.reminderAmbiguous(id: idOrPrefix, matches: matches)
+    case .notFound:
+        throw CLIError.reminderNotFound(id: idOrPrefix, listNameOrId: nameOrId)
     }
-    return calendar
+}
+
+/// `resolveIdentifier` over the reminders' external identifiers. The caller decides the search
+/// scope by what it fetches (`complete` only looks at incomplete reminders, `delete` at all of
+/// them, ...).
+func resolveReminder(_ reminders: [EKReminder], idOrPrefix: String, onList nameOrId: String) throws -> EKReminder {
+    let index = try resolveIdentifier(
+        reminders.map { $0.calendarItemExternalIdentifier ?? "" },
+        titles: reminders.map { $0.title ?? "<unknown>" },
+        idOrPrefix: idOrPrefix, onList: nameOrId)
+    return reminders[index]
 }
 
 public enum OutputFormat: String, ExpressibleByArgument {
@@ -749,10 +827,9 @@ public final class Reminders {
             || newRecurrenceInterval != nil || newRecurrenceEndDate != nil
             || clearRecurrenceEnd
 
-        let reminder = try self.reminder(
-            withId: id,
-            in: self.fetchReminders(on: [calendar], displayOptions: .incomplete),
-            onList: nameOrId)
+        let reminder = try resolveReminder(
+            self.fetchReminders(on: [calendar], displayOptions: .incomplete),
+            idOrPrefix: id, onList: nameOrId)
 
         reminder.title = newText ?? reminder.title
         if clearNotes {
@@ -856,10 +933,9 @@ public final class Reminders {
         outputFormat: OutputFormat) throws
     {
         let calendar = try self.calendar(withNameOrId: nameOrId)
-        let reminder = try self.reminder(
-            withId: id,
-            in: self.fetchReminders(on: [calendar], displayOptions: .incomplete),
-            onList: nameOrId)
+        let reminder = try resolveReminder(
+            self.fetchReminders(on: [calendar], displayOptions: .incomplete),
+            idOrPrefix: id, onList: nameOrId)
 
         let resolvedComponents: DateComponents
         if toNextWeekday {
@@ -904,10 +980,9 @@ public final class Reminders {
 
     func setComplete(_ complete: Bool, itemAtId id: String, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) throws {
         let calendar = try self.calendar(withNameOrId: nameOrId)
-        let reminder = try self.reminder(
-            withId: id,
-            in: self.fetchReminders(on: [calendar], displayOptions: complete ? .incomplete : .complete),
-            onList: nameOrId)
+        let reminder = try resolveReminder(
+            self.fetchReminders(on: [calendar], displayOptions: complete ? .incomplete : .complete),
+            idOrPrefix: id, onList: nameOrId)
 
         reminder.isCompleted = complete
         try self.save(reminder, action: complete ? "complete reminder" : "uncomplete reminder")
@@ -923,10 +998,9 @@ public final class Reminders {
         let calendar = try self.calendar(withNameOrId: nameOrId)
         // External identifiers are stable regardless of completion state, so a
         // reminder already marked complete can still be found and deleted by its id.
-        let reminder = try self.reminder(
-            withId: id,
-            in: self.fetchReminders(on: [calendar], displayOptions: .all),
-            onList: nameOrId)
+        let reminder = try resolveReminder(
+            self.fetchReminders(on: [calendar], displayOptions: .all),
+            idOrPrefix: id, onList: nameOrId)
 
         // Encode before removing: the encoder reads `reminder.calendar`, which is
         // no longer meaningful once the reminder is gone from the store.
@@ -1025,20 +1099,6 @@ public final class Reminders {
     private func getCalendars() -> [EKCalendar] {
         return Store.calendars(for: .reminder)
                     .filter { $0.allowsContentModifications }
-    }
-
-    // Kept internal (not private) so it's directly unit-testable via `@testable import`,
-    // matching `matchesAdditionalFilters` above.
-    func getReminder(from reminders: [EKReminder], withId id: String) -> EKReminder? {
-        return reminders.first { $0.calendarItemExternalIdentifier == id }
-    }
-
-    /// `getReminder` with the "not found" case turned into the error every command reports.
-    func reminder(withId id: String, in reminders: [EKReminder], onList nameOrId: String) throws -> EKReminder {
-        guard let reminder = self.getReminder(from: reminders, withId: id) else {
-            throw CLIError.reminderNotFound(id: id, listNameOrId: nameOrId)
-        }
-        return reminder
     }
 
 }

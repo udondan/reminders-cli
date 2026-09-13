@@ -73,7 +73,7 @@ private struct ShowAll: FormattedCommand {
     @Option(help: "Only show reminders whose title or notes contain this text (case-insensitive)")
     var search: String?
 
-    @Option(help: "Only show reminders from this list; repeat to specify multiple")
+    @Option(help: "Only show reminders from this list (name, unique part of a name, or ID); repeat to specify multiple")
     var list: [String] = []
 
     @Option(help: "Only show completed reminders completed on or after this date")
@@ -124,7 +124,7 @@ private struct Show: FormattedCommand {
         abstract: "Print the items on the given list")
 
     @Argument(
-        help: "The list to print items from, see 'show-lists' for names or IDs",
+        help: "The list to print items from: a name, a unique part of a name, or an ID from 'show-lists'",
         completion: .custom(listNameCompletion))
     var listNameOrId: String
 
@@ -218,7 +218,7 @@ private struct Add: FormattedCommand {
         abstract: "Add a reminder to a list")
 
     @Argument(
-        help: "The list to add to, see 'show-lists' for names or IDs",
+        help: "The list to add to: a name, a unique part of a name, or an ID from 'show-lists'",
         completion: .custom(listNameCompletion))
     var listNameOrId: String
 
@@ -306,12 +306,12 @@ private struct Complete: FormattedCommand {
         abstract: "Complete a reminder")
 
     @Argument(
-        help: "The list to complete a reminder on, see 'show-lists' for names or IDs",
+        help: "The list to complete a reminder on: a name, a unique part of a name, or an ID from 'show-lists'",
         completion: .custom(listNameCompletion))
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to complete, see 'show' for IDs")
+        help: "The id of the reminder to complete, or a unique prefix of at least 4 characters, see 'show' for IDs")
     var id: String
 
     @Option(
@@ -331,12 +331,12 @@ private struct Uncomplete: FormattedCommand {
         abstract: "Uncomplete a reminder")
 
     @Argument(
-        help: "The list to uncomplete a reminder on, see 'show-lists' for names or IDs",
+        help: "The list to uncomplete a reminder on: a name, a unique part of a name, or an ID from 'show-lists'",
         completion: .custom(listNameCompletion))
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to uncomplete, see 'show' for IDs")
+        help: "The id of the reminder to uncomplete, or a unique prefix of at least 4 characters, see 'show' for IDs")
     var id: String
 
     @Option(
@@ -356,12 +356,12 @@ private struct Delete: FormattedCommand {
         abstract: "Delete a reminder")
 
     @Argument(
-        help: "The list to delete a reminder on, see 'show-lists' for names or IDs",
+        help: "The list to delete a reminder on: a name, a unique part of a name, or an ID from 'show-lists'",
         completion: .custom(listNameCompletion))
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to delete, see 'show' for IDs")
+        help: "The id of the reminder to delete, or a unique prefix of at least 4 characters, see 'show' for IDs")
     var id: String
 
     @Option(
@@ -385,12 +385,12 @@ private struct Edit: FormattedCommand {
         abstract: "Edit the text of a reminder")
 
     @Argument(
-        help: "The list to edit a reminder on, see 'show-lists' for names or IDs",
+        help: "The list to edit a reminder on: a name, a unique part of a name, or an ID from 'show-lists'",
         completion: .custom(listNameCompletion))
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to edit, see 'show' for IDs")
+        help: "The id of the reminder to edit, or a unique prefix of at least 4 characters, see 'show' for IDs")
     var id: String
 
     @Option(
@@ -403,7 +403,7 @@ private struct Edit: FormattedCommand {
 
     @Option(
         name: .long,
-        help: "Move the reminder to a different list, see 'show-lists' for names",
+        help: "Move the reminder to a different list: a name, a unique part of a name, or an ID from 'show-lists'",
         completion: .custom(listNameCompletion))
     var list: String?
 
@@ -528,12 +528,12 @@ private struct Postpone: FormattedCommand {
         abstract: "Move a reminder's due date without changing its repeat rule")
 
     @Argument(
-        help: "The list the reminder is on, see 'show-lists' for names or IDs",
+        help: "The list the reminder is on: a name, a unique part of a name, or an ID from 'show-lists'",
         completion: .custom(listNameCompletion))
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to postpone, see 'show' for IDs")
+        help: "The id of the reminder to postpone, or a unique prefix of at least 4 characters, see 'show' for IDs")
     var id: String
 
     @Argument(
