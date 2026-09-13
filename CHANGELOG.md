@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.3.0](https://github.com/udondan/reminders-cli/compare/v3.2.0...v3.3.0) (2026-09-13)
+
+
+### Features
+
+* match list names loosely and accept reminder ID prefixes ([#57](https://github.com/udondan/reminders-cli/issues/57)) ([b191fbb](https://github.com/udondan/reminders-cli/commit/b191fbb54b6199ff5e9a7b63fd211d031edc231c)), closes [#46](https://github.com/udondan/reminders-cli/issues/46)
+
 ## [3.2.0](https://github.com/udondan/reminders-cli/compare/v3.1.1...v3.2.0) (2026-09-13)
 
 
