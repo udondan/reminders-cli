@@ -2,11 +2,11 @@
 
 A simple CLI for interacting with OS X reminders.
 
-## Usage:
+## Usage
 
-#### Show all lists
+### Show all lists
 
-```
+```console
 $ reminders show-lists
 Soon (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)
 Eventually (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)
@@ -18,9 +18,9 @@ Every list also has a stable identifier, shown above in parentheses (and availab
 for scripting against a list whose name might change or contains characters that are awkward on the
 command line.
 
-#### Show reminders on a specific list
+### Show reminders on a specific list
 
-```
+```console
 $ reminders show Soon
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
@@ -31,11 +31,12 @@ list identifiers above. This is what you pass to `complete`, `uncomplete`, `edit
 `delete` to act on a specific reminder; unlike a list position, it keeps pointing at the same
 reminder even if the list changes in between.
 
-#### Complete an item on a list
+### Complete an item on a list
 
-```
+```console
 $ reminders complete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C
 Completed 'Write README'
+
 $ reminders show Soon
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 ```
@@ -43,26 +44,31 @@ $ reminders show Soon
 `complete`, `uncomplete`, and `edit` also accept `--format json` to print the affected reminder as
 JSON instead of the plain-text confirmation shown above.
 
-#### Undo a completed item
+### Undo a completed item
 
-```
+```console
 $ reminders show Soon --only-completed
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
+
 $ reminders uncomplete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C
 Uncompleted 'Write README'
+
 $ reminders show Soon
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
 ```
 
-#### Edit an item on a list
+### Edit an item on a list
 
-```
+```console
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C Some edited text
 Updated reminder 'Some edited text'
+
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --due-date "tomorrow 9am"
 Updated reminder 'Some edited text'
+
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --clear-due-date
 Updated reminder 'Some edited text'
+
 $ reminders show Soon
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Some edited text
@@ -70,48 +76,51 @@ $ reminders show Soon
 
 Set or clear a reminder's priority:
 
-```
+```console
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --priority high
 Updated reminder 'Some edited text'
+
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --clear-priority
 Updated reminder 'Some edited text'
 ```
 
 Move a reminder to a different list:
 
-```
+```console
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --list "Some Other List"
 Updated reminder 'Some edited text'
+
 $ reminders show "Some Other List"
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Some edited text
 ```
 
-#### Postpone a reminder
+### Postpone a reminder
 
 Set a specific new due date; any existing repeat rule is left completely unchanged:
 
-```
+```console
 $ reminders postpone Soon B9D4E8A7-6FAC-4D3B-EA87-1C2E5F607182 "next monday 9am"
 Postponed reminder 'Water the plants'
 ```
 
 Or shift it to the next weekday, preserving its time of day:
 
-```
+```console
 $ reminders postpone Soon B9D4E8A7-6FAC-4D3B-EA87-1C2E5F607182 --next-weekday
 Postponed reminder 'Water the plants'
 ```
 
 `--next-weekday` always moves the due date forward by at least one day, based on the reminder's
-*current* due date (not today), skipping Saturday and Sunday — so a reminder due Wednesday moves to
+_current_ due date (not today), skipping Saturday and Sunday — so a reminder due Wednesday moves to
 Thursday, and one due Friday moves to the following Monday. It requires the reminder to already
 have a due date.
 
-#### Delete an item on a list
+### Delete an item on a list
 
-```
+```console
 $ reminders delete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C
 Deleted 'Write README'
+
 $ reminders show Soon
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 ```
@@ -119,12 +128,15 @@ $ reminders show Soon
 `delete` looks a reminder up by ID regardless of its completion state, so a reminder that's already
 been completed can be deleted the same way, without any special-casing.
 
-#### Add a reminder to a list
+### Add a reminder to a list
 
-```
+```console
 $ reminders add Soon Contribute to open source
+
 $ reminders add Soon Go to the grocery store --due-date "tomorrow 9am"
+
 $ reminders add Soon Something really important --priority high
+
 $ reminders show Soon
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source
@@ -132,120 +144,145 @@ C4E9F3B2-1A5D-4E8C-9B32-6D7F0A1B2C3D: Go to the grocery store (in 10 hours)
 D5F0A4C3-2B6E-4F9D-AC43-7E8A1B2C3D4E: Something really important (priority: high)
 ```
 
-#### Add a repeating reminder
+### Add a repeating reminder
 
-```
+```console
 $ reminders add Soon Weekly review --due-date "monday 9am" --repeat weekly
+
 $ reminders add Soon Pay rent --due-date "2026-09-01" --repeat monthly --repeat-until "2027-09-01"
+
 $ reminders add Soon Water the plants --due-date "tomorrow" --repeat daily --repeat-interval 3
 ```
 
-`--repeat` accepts `daily`, `weekly`, `monthly`, or `yearly` (EventKit reminders have no hourly
-recurrence frequency, so `--repeat hourly` is rejected with an explanation rather than silently
-degrading to daily). `--repeat-interval` repeats every N units instead of every 1 (e.g.
-`--repeat-interval 2 --repeat weekly` for every other week) and defaults to 1. Use
-`--repeat-until` to stop after a date; omitting it repeats forever, matching the Reminders.app
-default. A date without a time includes the whole local day. On `add`, recurrence options require
-`--repeat` to also be set, and a repeating reminder requires `--due-date`.
+- `--repeat` accepts `daily`, `weekly`, `monthly`, or `yearly`. EventKit reminders have no hourly
+  recurrence frequency, so `--repeat hourly` is rejected with an explanation rather than silently
+  degrading to daily.
+- `--repeat-interval` repeats every N units instead of every 1 (e.g. `--repeat-interval 2
+--repeat weekly` for every other week) and defaults to 1.
+- `--repeat-until` stops the recurrence after a date; omitting it repeats forever, matching the
+  Reminders.app default. A date without a time includes the whole local day.
+- On `add`, recurrence options require `--repeat` to also be set, and a repeating reminder
+  requires `--due-date`.
 
 To change or remove a repeat rule on an existing reminder, use `edit`:
 
-```
+```console
 $ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat monthly
+
 $ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat-until "2027-09-01"
+
 $ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat-end
+
 $ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat
 ```
 
-Changing only the interval or end condition preserves the existing frequency and any complex
-selectors, such as "the last Friday of every month". Changing the frequency preserves the existing
-end condition but resets its interval to 1 unless `--repeat-interval` is supplied. An end-only edit
-copies the complete EventKit rule so provider-specific calendar metadata is preserved as well.
-JSON output includes `recurrence`, `recurrenceInterval`, and either `recurrenceEnd` or
-`recurrenceCount` (when an existing rule is count-based) for repeating reminders, plus a `hasRecurrence`
-boolean on every reminder (so scripts can check it without testing for a missing or `null` field) and,
-where computable, a `nextDueDate`.
+- Changing only the interval or end condition preserves the existing frequency and any complex
+  selectors, such as "the last Friday of every month".
+- Changing the frequency preserves the existing end condition but resets its interval to 1 unless
+  `--repeat-interval` is supplied.
+- An end-only edit copies the complete EventKit rule so provider-specific calendar metadata is
+  preserved as well.
+- JSON output includes `recurrence`, `recurrenceInterval`, and either `recurrenceEnd` or
+  `recurrenceCount` (when an existing rule is count-based) for repeating reminders, plus a
+  `hasRecurrence` boolean on every reminder (so scripts can check it without testing for a
+  missing or `null` field) and, where computable, a `nextDueDate`.
 
-Known behavior: EventKit does not advance a repeating reminder's due date as occurrences pass — once
-the due date is in the past, `dueDate`/`dueDateComponents` stay at whatever they were last set to
-(observed directly against Reminders.app; this isn't otherwise documented by Apple), and the
-reminder can end up showing arbitrarily overdue instead of jumping to the next occurrence. Use the
-`nextDueDate` JSON field if you need the next actionable occurrence instead: it's computed by this
-CLI by stepping the rule's frequency/interval forward from its due date, respecting `--repeat-until`/
-occurrence-count ends. It's only populated for the plain daily/weekly/monthly/yearly (+ interval)
-rules this CLI itself creates and edits; a rule with EventKit-native selectors such as "the last
-Friday of every month" (only reachable by editing a rule this CLI didn't create) omits the field
-rather than guess.
+**Known behavior:** EventKit does not advance a repeating reminder's due date as occurrences pass.
 
-#### Show reminders due on or by a date
+- Once the due date is in the past, `dueDate`/`dueDateComponents` stay at whatever they were last
+  set to (observed directly against Reminders.app; this isn't otherwise documented by Apple), and
+  the reminder can end up showing arbitrarily overdue instead of jumping to the next occurrence.
+- Use the `nextDueDate` JSON field if you need the next actionable occurrence instead: it's
+  computed by this CLI by stepping the rule's frequency/interval forward from its due date,
+  respecting `--repeat-until`/occurrence-count ends.
+- It's only populated for the plain daily/weekly/monthly/yearly (+ interval) rules this CLI
+  itself creates and edits; a rule with EventKit-native selectors such as "the last Friday of
+  every month" (only reachable by editing a rule this CLI didn't create) omits the field rather
+  than guess.
 
-```
+### Show reminders due on or by a date
+
+```console
 $ reminders show-all --due-date today
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show-all --due-date today --include-overdue
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show-all --due-date 2025-02-16
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show Soon --due-date today --include-overdue
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 ```
 
-#### Filter reminders
+### Filter reminders
 
 `show` and `show-all` support additional, freely combinable filters (all ANDed together, and
 applied identically to `--format plain` and `--format json`):
 
-```
+```console
 $ reminders show-all --overdue
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
+
 $ reminders show-all --due-before "in 7 days"
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show-all --due-after "in 7 days"
 E6A1B5D4-3C7F-4A0E-BD54-8F9B2C3D4E5F: Renew passport (in 2 weeks)
+
 $ reminders show-all --no-due-date
 F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book
+
 $ reminders show-all --priority high --priority medium
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
+
 $ reminders show-all --search groceries
 A8C3D7F6-5E9B-4C2A-DF76-0B1D4E5F6071: Buy groceries
+
 $ reminders show-all --list Soon --list Work
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show-all --include-completed --completed-since monday
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
 ```
 
-`--priority` and `--list` may be repeated to match any of several values. `--list` restricts which
-lists are searched and is only available on `show-all` (`show <list>` already targets a single
-list). `--due-before`/`--due-after` accept the same natural-language dates as `--due-date`; a
-date without a time includes the whole local day for `--due-before` (matching the `--repeat-until`
-behavior above), while `--due-after` uses the parsed date's own start as an inclusive lower bound.
-`--overdue` is independent of, and combinable with, `--due-date`/`--include-overdue`. `--no-due-date`
-cannot be combined with `--due-date`, `--due-before`, `--due-after`, `--overdue`, or
-`--include-overdue`, since those all require a due date to compare against. `--completed-since`
-accepts the same natural-language dates as `--due-date`/`--due-after`, uses an inclusive lower
-bound against each reminder's completion time, and requires `--only-completed` or
-`--include-completed`, since there's nothing to filter otherwise.
+- `--priority` and `--list` may be repeated to match any of several values. `--list` restricts
+  which lists are searched and is only available on `show-all` (`show <list>` already targets a
+  single list).
+- `--due-before`/`--due-after` accept the same natural-language dates as `--due-date`. A date
+  without a time includes the whole local day for `--due-before` (matching the `--repeat-until`
+  behavior above), while `--due-after` uses the parsed date's own start as an inclusive lower
+  bound.
+- `--overdue` is independent of, and combinable with, `--due-date`/`--include-overdue`.
+- `--no-due-date` cannot be combined with `--due-date`, `--due-before`, `--due-after`,
+  `--overdue`, or `--include-overdue`, since those all require a due date to compare against.
+- `--completed-since` accepts the same natural-language dates as `--due-date`/`--due-after`, uses
+  an inclusive lower bound against each reminder's completion time, and requires
+  `--only-completed` or `--include-completed`, since there's nothing to filter otherwise.
 
-#### Sort reminders
+### Sort reminders
 
 `show` and `show-all` support `--sort`, one of `none` (default), `creation-date`, `due-date`, or
 `priority`, and `--sort-order`, one of `ascending` (default) or `descending`. Each reminder's ID is
 always shown as the leading prefix, regardless of `--sort`, since it identifies the reminder rather
 than its position in the list:
 
-```
+```console
 $ reminders show-all --sort due-date
 Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 Work: E6A1B5D4-3C7F-4A0E-BD54-8F9B2C3D4E5F: Renew passport (in 2 weeks)
 Eventually: F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book
+
 $ reminders show-all --sort priority
 Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (priority: high)
 Work: CAE5F9B8-70BD-4E4C-FB98-2D3F60718293: Prepare slides (priority: medium)
 Eventually: F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book (priority: low)
 Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show-all --sort priority --sort-order descending
 Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 Eventually: F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book (priority: low)
@@ -253,42 +290,44 @@ Work: CAE5F9B8-70BD-4E4C-FB98-2D3F60718293: Prepare slides (priority: medium)
 Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (priority: high)
 ```
 
-`--sort priority` orders high before medium before low before no-priority reminders in ascending
-order (reversed for `descending`); reminders tied on priority are always broken by due date
-ascending, regardless of `--sort-order`. `--sort due-date` always sorts reminders with no due date
-to the end, in both ascending and descending order.
+- `--sort priority` orders high before medium before low before no-priority reminders in
+  ascending order (reversed for `descending`); reminders tied on priority are always broken by
+  due date ascending, regardless of `--sort-order`.
+- `--sort due-date` always sorts reminders with no due date to the end, in both ascending and
+  descending order.
 
-#### See help for more examples
+### See help for more examples
 
-```
+```console
 $ reminders --help
+
 $ reminders show -h
 ```
 
-## Installation:
+## Installation
 
-#### With [Homebrew](http://brew.sh/)
+### With [Homebrew](http://brew.sh/)
 
-```
+```console
 $ brew install keith/formulae/reminders-cli
 ```
 
-#### From GitHub releases
+### From GitHub releases
 
 Download the latest release from
 [here](https://github.com/keith/reminders-cli/releases)
 
-```
+```console
 $ tar -zxvf reminders.tar.gz
 $ mv reminders /usr/local/bin
 $ rm reminders.tar.gz
 ```
 
-#### Building manually
+### Building manually
 
 This requires a recent Xcode installation.
 
-```
+```console
 $ cd reminders-cli
 $ make build-release
 $ cp .build/apple/Products/Release/reminders /usr/local/bin/reminders
