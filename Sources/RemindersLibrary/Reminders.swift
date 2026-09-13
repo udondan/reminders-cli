@@ -270,6 +270,87 @@ func validateRecurrenceSchedule(
     try validateRecurrenceEnd(dueDateComponents: dueDateComponents, rules: rules)
 }
 
+// EventKit doesn't advance `dueDateComponents` on a repeating EKReminder as
+// occurrences pass -- it stays at whatever it was last set to, and can end up
+// arbitrarily far overdue. `nextOccurrence` computes what the next actionable
+// due date would be instead, by stepping the rule's frequency/interval
+// forward from its anchor date. It only handles the plain daily/weekly/
+// monthly/yearly + interval rules this CLI itself creates and edits; a rule
+// with EventKit-native selectors (`daysOfTheWeek`, `daysOfTheMonth`, etc. --
+// only reachable by editing a rule this CLI didn't create) returns nil rather
+// than guess.
+private let maxRecurrenceSteps = 10_000
+
+private func hasComplexSelectors(_ rule: EKRecurrenceRule) -> Bool {
+    !(rule.daysOfTheWeek ?? []).isEmpty
+        || !(rule.daysOfTheMonth ?? []).isEmpty
+        || !(rule.monthsOfTheYear ?? []).isEmpty
+        || !(rule.weeksOfTheYear ?? []).isEmpty
+        || !(rule.daysOfTheYear ?? []).isEmpty
+        || !(rule.setPositions ?? []).isEmpty
+}
+
+private func calendarComponent(for frequency: EKRecurrenceFrequency) -> Calendar.Component? {
+    switch frequency {
+    case .daily: return .day
+    case .weekly: return .weekOfYear
+    case .monthly: return .month
+    case .yearly: return .year
+    @unknown default: return nil
+    }
+}
+
+func nextOccurrence(
+    of rule: EKRecurrenceRule, anchoredAt anchor: Date, onOrAfter referenceDate: Date
+) -> Date? {
+    guard !hasComplexSelectors(rule), let component = calendarComponent(for: rule.frequency) else {
+        return nil
+    }
+
+    let interval = max(rule.interval, 1)
+    let calendar = Calendar.current
+    let endDate = rule.recurrenceEnd?.endDate
+    let occurrenceLimit = rule.recurrenceEnd?.occurrenceCount
+
+    func isWithinBounds(_ date: Date, occurrenceNumber: Int) -> Bool {
+        if let endDate, date > endDate {
+            return false
+        }
+        if let occurrenceLimit, occurrenceLimit > 0, occurrenceNumber > occurrenceLimit {
+            return false
+        }
+        return true
+    }
+
+    var occurrence = anchor
+    var occurrenceNumber = 1
+
+    while occurrence < referenceDate {
+        guard isWithinBounds(occurrence, occurrenceNumber: occurrenceNumber),
+            let next = calendar.date(byAdding: component, value: interval, to: occurrence)
+        else {
+            return nil
+        }
+        occurrence = next
+        occurrenceNumber += 1
+
+        if occurrenceNumber > maxRecurrenceSteps {
+            return nil
+        }
+    }
+
+    return isWithinBounds(occurrence, occurrenceNumber: occurrenceNumber) ? occurrence : nil
+}
+
+func nextDueDate(from reminder: EKReminder, referenceDate: Date = Date()) -> Date? {
+    guard let rule = reminder.recurrenceRules?.first,
+        let anchor = reminder.dueDateComponents?.date
+    else {
+        return nil
+    }
+    return nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: referenceDate)
+}
+
 public enum Priority: String, ExpressibleByArgument {
     case none
     case low
