@@ -8,9 +8,15 @@ A simple CLI for interacting with OS X reminders.
 
 ```
 $ reminders show-lists
-Soon
-Eventually
+Soon (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)
+Eventually (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)
 ```
+
+Every list also has a stable identifier, shown above in parentheses (and available as
+`calendarIdentifier` with `--format json`). Anywhere a list name is accepted — `show`, `show-all`,
+`add`, `complete`, `uncomplete`, `edit`, `delete` — a list ID works too, which is useful for
+scripting against a list whose name might change or contains characters that are awkward on the
+command line.
 
 #### Show reminders on a specific list
 
@@ -28,6 +34,9 @@ Completed 'Write README'
 $ reminders show Soon
 0 Ship reminders-cli
 ```
+
+`complete`, `uncomplete`, and `edit` also accept `--format json` to print the affected reminder as
+JSON instead of the plain-text confirmation shown above.
 
 #### Undo a completed item
 
@@ -79,6 +88,16 @@ $ reminders delete Soon 0
 Completed 'Write README'
 $ reminders show Soon
 0 Ship reminders-cli
+```
+
+The index argument above only matches against incomplete reminders, the same set `show` displays
+by default. To delete a reminder that's already been completed, pass its ID (from `show
+--only-completed --format json`, or the `externalId` field) instead of an index — an ID is looked
+up regardless of completion state:
+
+```
+$ reminders delete Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17
+Deleted 'Write README'
 ```
 
 #### Add a reminder to a list
