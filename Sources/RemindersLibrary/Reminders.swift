@@ -213,6 +213,17 @@ enum RecurrenceUpdateError: LocalizedError {
     }
 }
 
+enum PostponeError: LocalizedError {
+    case missingDueDate
+
+    var errorDescription: String? {
+        switch self {
+        case .missingDueDate:
+            return "--next-weekday requires the reminder to already have a due date"
+        }
+    }
+}
+
 struct RecurrenceUpdate {
     let recurrence: Recurrence?
     let interval: Int?
@@ -412,6 +423,30 @@ func nextDueDate(from reminder: EKReminder, referenceDate: Date = Date()) -> Dat
         return nil
     }
     return nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: referenceDate)
+}
+
+// Used by `postpone --next-weekday`. Always advances at least one calendar
+// day from `anchor` -- a Wednesday lands on Thursday, not a no-op -- then
+// keeps stepping while the candidate falls on a weekend, so Friday, Saturday,
+// and Sunday all land on the following Monday. Preserves `anchor`'s
+// time-of-day when it had one; a date-only (all-day) anchor stays date-only.
+func nextWeekday(after anchor: DateComponents, calendar: Calendar = Calendar.current) -> DateComponents? {
+    guard let anchorDate = anchor.date else {
+        return nil
+    }
+
+    var candidate = anchorDate
+    repeat {
+        guard let next = calendar.date(byAdding: .day, value: 1, to: candidate) else {
+            return nil
+        }
+        candidate = next
+    } while calendar.isDateInWeekend(candidate)
+
+    let wantedComponents = anchor.hour != nil
+        ? calendarComponents()
+        : calendarComponents(except: timeComponents)
+    return calendar.dateComponents(wantedComponents, from: candidate)
 }
 
 public enum Priority: String, ExpressibleByArgument {
@@ -770,6 +805,68 @@ public final class Reminders {
                 }
             } catch let error {
                 print("Failed to update reminder with error: \(error.localizedDescription)")
+                exit(1)
+            }
+
+            semaphore.signal()
+        }
+        semaphore.wait()
+    }
+
+    func postpone(
+        itemAtIndexOrId indexOrId: String,
+        onListNamedOrId nameOrId: String,
+        to newDueDateComponents: DateComponents?,
+        toNextWeekday: Bool,
+        outputFormat: OutputFormat)
+    {
+        let calendar = self.calendar(withNameOrId: nameOrId)
+        let semaphore = DispatchSemaphore(value: 0)
+
+        self.reminders(on: [calendar], displayOptions: .incomplete) { reminders in
+            guard let reminder = self.getReminder(from: reminders, atIndexOrId: indexOrId) else {
+                print("No reminder at index or with ID \(indexOrId) on \(nameOrId)")
+                exit(1)
+            }
+
+            do {
+                let resolvedComponents: DateComponents
+                if toNextWeekday {
+                    guard let currentDue = reminder.dueDateComponents,
+                        let shifted = nextWeekday(after: currentDue)
+                    else {
+                        throw PostponeError.missingDueDate
+                    }
+                    resolvedComponents = shifted
+                } else if let newDueDateComponents {
+                    resolvedComponents = newDueDateComponents
+                } else {
+                    fatalError("postpone requires either a new due date or --next-weekday")
+                }
+
+                // recurrenceRules is never read or written here, so any
+                // existing repeat rule passes through completely unchanged.
+                reminder.dueDateComponents = resolvedComponents
+                for alarm in reminder.alarms ?? [] {
+                    reminder.removeAlarm(alarm)
+                }
+                if let date = resolvedComponents.date, resolvedComponents.hour != nil {
+                    reminder.addAlarm(EKAlarm(absoluteDate: date))
+                }
+
+                try validateRecurrenceSchedule(
+                    dueDateComponents: reminder.dueDateComponents,
+                    rules: reminder.recurrenceRules ?? [])
+
+                try Store.save(reminder, commit: true)
+                switch outputFormat {
+                case .json:
+                    print(encodeToJson(data: reminder))
+                case .plain:
+                    print("Postponed reminder '\(reminder.title!)'")
+                }
+            } catch let error {
+                print("Failed to postpone reminder with error: \(error.localizedDescription)")
                 exit(1)
             }
 
