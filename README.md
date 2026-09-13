@@ -54,6 +54,24 @@ $ reminders show Soon
 1 Some edited text
 ```
 
+Set or clear a reminder's priority:
+
+```
+$ reminders edit Soon 0 --priority high
+Updated reminder 'Some edited text'
+$ reminders edit Soon 0 --clear-priority
+Updated reminder 'Some edited text'
+```
+
+Move a reminder to a different list:
+
+```
+$ reminders edit Soon 0 --list "Some Other List"
+Updated reminder 'Some edited text'
+$ reminders show "Some Other List"
+0 Some edited text
+```
+
 #### Delete an item on a list
 
 ```
