@@ -14,8 +14,8 @@ Eventually (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)
 
 Every list also has a stable identifier, shown above in parentheses (and available as
 `calendarIdentifier` with `--format json`). Anywhere a list name is accepted — `show`, `show-all`,
-`add`, `complete`, `uncomplete`, `edit`, `delete` — a list ID works too, which is useful for
-scripting against a list whose name might change or contains characters that are awkward on the
+`add`, `complete`, `uncomplete`, `edit`, `postpone`, `delete` — a list ID works too, which is useful
+for scripting against a list whose name might change or contains characters that are awkward on the
 command line.
 
 #### Show reminders on a specific list
@@ -80,6 +80,27 @@ Updated reminder 'Some edited text'
 $ reminders show "Some Other List"
 0 Some edited text
 ```
+
+#### Postpone a reminder
+
+Set a specific new due date; any existing repeat rule is left completely unchanged:
+
+```
+$ reminders postpone Soon 0 "next monday 9am"
+Postponed reminder 'Water the plants'
+```
+
+Or shift it to the next weekday, preserving its time of day:
+
+```
+$ reminders postpone Soon 0 --next-weekday
+Postponed reminder 'Water the plants'
+```
+
+`--next-weekday` always moves the due date forward by at least one day, based on the reminder's
+*current* due date (not today), skipping Saturday and Sunday — so a reminder due Wednesday moves to
+Thursday, and one due Friday moves to the following Monday. It requires the reminder to already
+have a due date.
 
 #### Delete an item on a list
 

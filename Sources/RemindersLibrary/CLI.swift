@@ -500,6 +500,53 @@ private struct Edit: ParsableCommand {
     }
 }
 
+private struct Postpone: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Move a reminder's due date without changing its repeat rule")
+
+    @Argument(
+        help: "The list the reminder is on, see 'show-lists' for names or IDs",
+        completion: .custom(listNameCompletion))
+    var listNameOrId: String
+
+    @Argument(
+        help: "The index or id of the reminder to postpone, see 'show' for indexes and IDs")
+    var indexOrId: String
+
+    @Argument(
+        help: "The new due date for the reminder; omit this when using --next-weekday")
+    var date: DateComponents?
+
+    @Flag(
+        name: .long,
+        help: "Move the due date to the next weekday (Mon-Fri), preserving its time of day; the reminder must already have a due date")
+    var nextWeekday = false
+
+    @Option(
+        name: .shortAndLong,
+        help: "Output format (plain or json)")
+    var format: OutputFormat = .plain
+
+    func validate() throws {
+        if self.date != nil && self.nextWeekday {
+            throw ValidationError("Cannot specify both a new due date and --next-weekday")
+        }
+        if self.date == nil && !self.nextWeekday {
+            throw ValidationError("Must specify either a new due date or --next-weekday")
+        }
+    }
+
+    func run() {
+        reminders.postpone(
+            itemAtIndexOrId: self.indexOrId,
+            onListNamedOrId: self.listNameOrId,
+            to: self.date,
+            toNextWeekday: self.nextWeekday,
+            outputFormat: format
+        )
+    }
+}
+
 
 private struct NewList: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -529,6 +576,7 @@ public struct CLI: ParsableCommand {
             Uncomplete.self,
             Delete.self,
             Edit.self,
+            Postpone.self,
             Show.self,
             ShowLists.self,
             NewList.self,
