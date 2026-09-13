@@ -147,11 +147,9 @@ D5F0A4C3-2B6E-4F9D-AC43-7E8A1B2C3D4E: Something really important (priority: high
 ### Add a repeating reminder
 
 ```console
-$ reminders add Soon Weekly review --due-date "monday 9am" --repeat weekly
-
-$ reminders add Soon Pay rent --due-date "2026-09-01" --repeat monthly --repeat-until "2027-09-01"
-
-$ reminders add Soon Water the plants --due-date "tomorrow" --repeat daily --repeat-interval 3
+reminders add Soon Weekly review --due-date "monday 9am" --repeat weekly
+reminders add Soon Pay rent --due-date "2026-09-01" --repeat monthly --repeat-until "2027-09-01"
+reminders add Soon Water the plants --due-date "tomorrow" --repeat daily --repeat-interval 3
 ```
 
 - `--repeat` accepts `daily`, `weekly`, `monthly`, or `yearly`. EventKit reminders have no hourly
@@ -167,13 +165,10 @@ $ reminders add Soon Water the plants --due-date "tomorrow" --repeat daily --rep
 To change or remove a repeat rule on an existing reminder, use `edit`:
 
 ```console
-$ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat monthly
-
-$ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat-until "2027-09-01"
-
-$ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat-end
-
-$ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat
+reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat monthly
+reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat-until "2027-09-01"
+reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat-end
+reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat
 ```
 
 - Changing only the interval or end condition preserves the existing frequency and any complex
@@ -299,9 +294,9 @@ Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (priority: high)
 ### See help for more examples
 
 ```console
-$ reminders --help
+reminders --help
 
-$ reminders show -h
+reminders show -h
 ```
 
 ## Installation
@@ -309,7 +304,7 @@ $ reminders show -h
 ### With [Homebrew](http://brew.sh/)
 
 ```console
-$ brew install udondan/software/reminders-cli
+brew install udondan/software/reminders-cli
 ```
 
 ### From GitHub releases
@@ -318,9 +313,9 @@ Download the latest release from
 [here](https://github.com/udondan/reminders-cli/releases)
 
 ```console
-$ tar -zxvf reminders.tar.gz
-$ mv reminders /usr/local/bin
-$ rm reminders.tar.gz
+tar -zxvf reminders.tar.gz
+mv reminders /usr/local/bin
+rm reminders.tar.gz
 ```
 
 ### Building manually
@@ -328,7 +323,7 @@ $ rm reminders.tar.gz
 This requires a recent Xcode installation.
 
 ```console
-$ cd reminders-cli
-$ make build-release
-$ cp .build/apple/Products/Release/reminders /usr/local/bin/reminders
+cd reminders-cli
+make build-release
+cp .build/apple/Products/Release/reminders /usr/local/bin/reminders
 ```
