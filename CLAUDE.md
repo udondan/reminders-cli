@@ -30,7 +30,7 @@ Execution flows in one direction through four layers:
 5. **Supporting extensions**, used by the layers above:
    - `NaturalLanguage.swift` — `DateComponents(argument:)` (`ExpressibleByArgument`), parses natural-language date strings like `"tomorrow 9am"` for `--due-date` options via `NSDataDetector`. Known limitation: `"next weekend"` doesn't parse (Apple Feedback FB8921206), covered by a test expecting `nil`.
    - `Sort.swift` — `Sort`/`CustomSortOrder` enums backing `show --sort`/`--sort-order`.
-   - `EKReminder+Encodable.swift` — manual `Encodable` conformance for `EKReminder`, used for `--format json` output.
+   - `EKReminder+Encodable.swift` — manual `Encodable` conformance for `EKReminder`, used for `--format json` output. Its `EncodingKeys` enum is mirrored by the JSON field table in `skills/reminders-cli/SKILL.md` (the agent skill shipped by the Claude Code plugin in `.claude-plugin/plugin.json`); update the table in the same order whenever a key is added or removed, or CI (`.github/scripts/check-skill-json-fields.sh`) fails.
 
 When adding a new subcommand: add a `FormattedCommand` struct in `CLI.swift` (with a `--format` option so errors can be rendered as JSON), register it in `CLI`'s `subcommands`, and implement the actual behavior as a throwing method on `Reminders` in `Reminders.swift` — keep `CLI.swift` limited to argument parsing/dispatch, and report failures by throwing a `CLIError` rather than printing or exiting.
 

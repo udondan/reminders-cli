@@ -434,3 +434,10 @@ cd reminders-cli
 make build-release
 cp .build/apple/Products/Release/reminders /usr/local/bin/reminders
 ```
+
+## Using with AI agents
+
+Install the Claude Code plugin with `claude plugin marketplace add udondan/skills` followed by
+`claude plugin install reminders-cli@udondan`. Other agent frameworks can load the skill file
+directly from [skills/reminders-cli/SKILL.md](skills/reminders-cli/SKILL.md). Agents should always
+pass `--format json` and act on reminders by their stable ID, never by title.

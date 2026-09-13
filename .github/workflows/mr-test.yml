@@ -39,3 +39,13 @@ jobs:
       - name: Test
         if: steps.changes.outputs.code == 'true'
         run: swift test -Xswiftc -warnings-as-errors
+
+  skill-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check SKILL.md JSON field table against EncodingKeys
+        run: bash .github/scripts/check-skill-json-fields.sh
