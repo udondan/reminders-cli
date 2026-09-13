@@ -61,6 +61,51 @@ private func format(_ reminder: EKReminder, at index: Int?, listName: String? = 
     return "\(listString)\(indexString)\(reminder.title ?? "<unknown>")\(notesString)\(dateString)\(priorityString)\(recurrenceString)"
 }
 
+// Additional, independently-composable filters for `show`/`show-all`, ANDed together and ANDed
+// with the pre-existing day-granularity `--due-date`/`--include-overdue` filter. `now`,
+// `dueBefore`, and `dueAfter` are resolved to concrete `Date`s once per command invocation by
+// the caller, not per reminder. Kept internal (not private) so it's directly unit-testable via
+// `@testable import`, matching `recurrenceEndDate`/`nextOccurrence` elsewhere in this file.
+func matchesAdditionalFilters(
+    _ reminder: EKReminder,
+    now: Date,
+    overdue: Bool,
+    dueBefore: Date?,
+    dueAfter: Date?,
+    noDueDate: Bool,
+    priorities: [Priority],
+    search: String?
+) -> Bool {
+    let reminderDueDate = reminder.dueDateComponents?.date
+
+    if noDueDate && reminderDueDate != nil {
+        return false
+    }
+    if overdue && !(reminderDueDate.map { $0 < now } ?? false) {
+        return false
+    }
+    if let dueBefore, !(reminderDueDate.map { $0 <= dueBefore } ?? false) {
+        return false
+    }
+    if let dueAfter, !(reminderDueDate.map { $0 >= dueAfter } ?? false) {
+        return false
+    }
+    if !priorities.isEmpty {
+        let reminderPriority = Priority(reminder.mappedPriority) ?? .none
+        if !priorities.contains(reminderPriority) {
+            return false
+        }
+    }
+    if let search, !search.isEmpty {
+        let inTitle = reminder.title?.localizedCaseInsensitiveContains(search) ?? false
+        let inNotes = reminder.notes?.localizedCaseInsensitiveContains(search) ?? false
+        if !(inTitle || inNotes) {
+            return false
+        }
+    }
+    return true
+}
+
 public enum OutputFormat: String, ExpressibleByArgument {
     case json, plain
 }
@@ -416,33 +461,55 @@ public final class Reminders {
         }
     }
 
-    func showAllReminders(dueOn dueDate: DateComponents?, includeOverdue: Bool,
+    func showAllReminders(
+        dueOn dueDate: DateComponents?, includeOverdue: Bool,
+        overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
+        noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
+        lists: [String] = [],
         displayOptions: DisplayOptions, outputFormat: OutputFormat
     ) {
         let semaphore = DispatchSemaphore(value: 0)
         let calendar = Calendar.current
+        let now = Date()
+        // Date-only means the whole local day, same rule as --repeat-until; --due-after needs no
+        // expansion since a date-only value's `.date` is already midnight, the correct inclusive
+        // lower bound.
+        let dueBeforeDate = dueBefore.flatMap { recurrenceEndDate(from: $0) }
+        let dueAfterDate = dueAfter?.date
+        // Resolving --list up front means an unknown list name hard-errors via
+        // calendar(withName:)'s existing exit(1) before any reminders are fetched.
+        let calendars = lists.isEmpty ? self.getCalendars() : lists.map { self.calendar(withName: $0) }
 
-        self.reminders(on: self.getCalendars(), displayOptions: displayOptions) { reminders in
+        self.reminders(on: calendars, displayOptions: displayOptions) { reminders in
             var matchingReminders = [(EKReminder, Int, String)]()
             for (i, reminder) in reminders.enumerated() {
                 let listName = reminder.calendar.title
-                guard let dueDate = dueDate?.date else {
-                    matchingReminders.append((reminder, i, listName))
+
+                let matchesExistingDueDateFilter: Bool
+                if let dueDate = dueDate?.date {
+                    guard let reminderDueDate = reminder.dueDateComponents?.date else {
+                        continue
+                    }
+                    let sameDay = calendar.compare(
+                        reminderDueDate, to: dueDate, toGranularity: .day) == .orderedSame
+                    let earlierDay = calendar.compare(
+                        reminderDueDate, to: dueDate, toGranularity: .day) == .orderedAscending
+                    matchesExistingDueDateFilter = sameDay || (includeOverdue && earlierDay)
+                } else {
+                    matchesExistingDueDateFilter = true
+                }
+                guard matchesExistingDueDateFilter else {
                     continue
                 }
 
-                guard let reminderDueDate = reminder.dueDateComponents?.date else {
+                guard matchesAdditionalFilters(
+                    reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
+                    dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search
+                ) else {
                     continue
                 }
 
-                let sameDay = calendar.compare(
-                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedSame
-                let earlierDay = calendar.compare(
-                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedAscending
-
-                if sameDay || (includeOverdue && earlierDay) {
-                    matchingReminders.append((reminder, i, listName))
-                }
+                matchingReminders.append((reminder, i, listName))
             }
 
             switch outputFormat {
@@ -460,34 +527,49 @@ public final class Reminders {
         semaphore.wait()
     }
 
-    func showListItems(withName name: String, dueOn dueDate: DateComponents?, includeOverdue: Bool,
+    func showListItems(
+        withName name: String, dueOn dueDate: DateComponents?, includeOverdue: Bool,
+        overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
+        noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
         displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder)
     {
         let semaphore = DispatchSemaphore(value: 0)
         let calendar = Calendar.current
+        let now = Date()
+        let dueBeforeDate = dueBefore.flatMap { recurrenceEndDate(from: $0) }
+        let dueAfterDate = dueAfter?.date
 
         self.reminders(on: [self.calendar(withName: name)], displayOptions: displayOptions) { reminders in
             var matchingReminders = [(EKReminder, Int?)]()
             let reminders = sort == .none ? reminders : reminders.sorted(by: sort.sortFunction(order: sortOrder))
             for (i, reminder) in reminders.enumerated() {
                 let index = sort == .none ? i : nil
-                guard let dueDate = dueDate?.date else {
-                    matchingReminders.append((reminder, index))
+
+                let matchesExistingDueDateFilter: Bool
+                if let dueDate = dueDate?.date {
+                    guard let reminderDueDate = reminder.dueDateComponents?.date else {
+                        continue
+                    }
+                    let sameDay = calendar.compare(
+                        reminderDueDate, to: dueDate, toGranularity: .day) == .orderedSame
+                    let earlierDay = calendar.compare(
+                        reminderDueDate, to: dueDate, toGranularity: .day) == .orderedAscending
+                    matchesExistingDueDateFilter = sameDay || (includeOverdue && earlierDay)
+                } else {
+                    matchesExistingDueDateFilter = true
+                }
+                guard matchesExistingDueDateFilter else {
                     continue
                 }
 
-                guard let reminderDueDate = reminder.dueDateComponents?.date else {
+                guard matchesAdditionalFilters(
+                    reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
+                    dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search
+                ) else {
                     continue
                 }
 
-                let sameDay = calendar.compare(
-                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedSame
-                let earlierDay = calendar.compare(
-                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedAscending
-
-                if sameDay || (includeOverdue && earlierDay) {
-                    matchingReminders.append((reminder, index))
-                }
+                matchingReminders.append((reminder, index))
             }
 
             switch outputFormat {

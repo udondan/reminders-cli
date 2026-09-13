@@ -154,6 +154,38 @@ $ reminders show Soon --due-date today --include-overdue
 1: Contribute to open source (in 3 hours)
 ```
 
+#### Filter reminders
+
+`show` and `show-all` support additional, freely combinable filters (all ANDed together, and
+applied identically to `--format plain` and `--format json`):
+
+```
+$ reminders show-all --overdue
+0: Ship reminders-cli (2 days ago)
+$ reminders show-all --due-before "in 7 days"
+1: Contribute to open source (in 3 hours)
+$ reminders show-all --due-after "in 7 days"
+2: Renew passport (in 2 weeks)
+$ reminders show-all --no-due-date
+3: Read a book
+$ reminders show-all --priority high --priority medium
+0: Ship reminders-cli (2 days ago)
+$ reminders show-all --search groceries
+4: Buy groceries
+$ reminders show-all --list Soon --list Work
+0: Ship reminders-cli (2 days ago)
+1: Contribute to open source (in 3 hours)
+```
+
+`--priority` and `--list` may be repeated to match any of several values. `--list` restricts which
+lists are searched and is only available on `show-all` (`show <list>` already targets a single
+list). `--due-before`/`--due-after` accept the same natural-language dates as `--due-date`; a
+date without a time includes the whole local day for `--due-before` (matching the `--repeat-until`
+behavior above), while `--due-after` uses the parsed date's own start as an inclusive lower bound.
+`--overdue` is independent of, and combinable with, `--due-date`/`--include-overdue`. `--no-due-date`
+cannot be combined with `--due-date`, `--due-before`, `--due-after`, `--overdue`, or
+`--include-overdue`, since those all require a due date to compare against.
+
 #### See help for more examples
 
 ```
