@@ -681,30 +681,34 @@ public final class Reminders {
 
     func newList(with name: String, source requestedSourceName: String?) {
         let store = EKEventStore()
-        let sources = store.sources
-        guard var source = sources.first else {
-            print("No existing list sources were found, please create a list in Reminders.app")
-            exit(1)
+        // EventKit can expose several sources with the same title (e.g. an iCloud calendar
+        // account next to the iCloud reminders account). Only the ones that already hold
+        // reminder lists can accept a new one, so restrict the selection to those.
+        let reminderSourceIds = Set(
+            store.calendars(for: .reminder).compactMap { $0.source?.sourceIdentifier })
+        let candidates = store.sources.map {
+            ListSourceCandidate(
+                title: $0.title,
+                holdsReminderLists: reminderSourceIds.contains($0.sourceIdentifier))
         }
 
-        if let requestedSourceName = requestedSourceName {
-            guard let requestedSource = sources.first(where: { $0.title == requestedSourceName }) else
-            {
-                print("No source named '\(requestedSourceName)'")
-                exit(1)
+        let source: EKSource
+        switch selectListSource(requested: requestedSourceName, from: candidates) {
+        case .chosen(let index):
+            source = store.sources[index]
+        case .noSources:
+            print("No existing list sources were found, please create a list in Reminders.app")
+            exit(1)
+        case .notFound(let requested):
+            print("No source named '\(requested)' holds reminder lists")
+            exit(1)
+        case .ambiguous(let titles):
+            print("Multiple sources were found, please specify one with --source:")
+            for title in titles {
+                print("  \(title)")
             }
 
-            source = requestedSource
-        } else {
-            let uniqueSources = Set(sources.map { $0.title })
-            if uniqueSources.count > 1 {
-                print("Multiple sources were found, please specify one with --source:")
-                for source in uniqueSources {
-                    print("  \(source)")
-                }
-
-                exit(1)
-            }
+            exit(1)
         }
 
         let newList = EKCalendar(for: .reminder, eventStore: store)
@@ -1050,6 +1054,50 @@ public final class Reminders {
         return reminders.first { $0.calendarItemExternalIdentifier == id }
     }
 
+}
+
+/// A list source as seen by `new-list`, reduced to what the selection logic needs so it can be
+/// unit-tested without constructing `EKSource` (which EventKit doesn't allow).
+struct ListSourceCandidate: Equatable {
+    let title: String
+    let holdsReminderLists: Bool
+}
+
+enum ListSourceSelection: Equatable {
+    /// Index into the candidates array of the source to create the list in.
+    case chosen(Int)
+    /// No source holds reminder lists at all.
+    case noSources
+    /// `--source` named something that doesn't hold reminder lists.
+    case notFound(String)
+    /// Several differently-titled sources hold reminder lists and no `--source` was given.
+    case ambiguous([String])
+}
+
+/// Picks the source for `new-list`, considering only sources that already hold reminder lists.
+/// Sources are matched by title; when several reminder-capable sources share a title (rare, but
+/// possible with multiple accounts of the same kind) the first one wins.
+func selectListSource(requested: String?, from candidates: [ListSourceCandidate]) -> ListSourceSelection {
+    let usable = candidates.enumerated().filter { $0.element.holdsReminderLists }
+    guard let first = usable.first else {
+        return .noSources
+    }
+
+    if let requested {
+        guard let match = usable.first(where: { $0.element.title == requested }) else {
+            return .notFound(requested)
+        }
+        return .chosen(match.offset)
+    }
+
+    var titles: [String] = []
+    for (_, candidate) in usable where !titles.contains(candidate.title) {
+        titles.append(candidate.title)
+    }
+    if titles.count > 1 {
+        return .ambiguous(titles)
+    }
+    return .chosen(first.offset)
 }
 
 private func encodeToJson(data: Encodable) -> String {
