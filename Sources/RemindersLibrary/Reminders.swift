@@ -72,7 +72,8 @@ private func format(_ reminder: EKReminder, id: String, listName: String? = nil)
     let dateString = formattedDueDate(from: reminder).map { " (\($0))" } ?? ""
     let priorityString = Priority(reminder.mappedPriority).map { " (priority: \($0))" } ?? ""
     let listString = listName.map { "\($0): " } ?? ""
-    let notesString = reminder.notes.map { " (\($0))" } ?? ""
+    // EventKit stores cleared notes as "" rather than nil; both mean "no notes".
+    let notesString = reminder.notes.flatMap { $0.isEmpty ? nil : " (\($0))" } ?? ""
     let recurrenceString = formattedRecurrence(from: reminder).map { " (\($0))" } ?? ""
     return "\(listString)\(id): \(reminder.title ?? "<unknown>")\(notesString)\(dateString)\(priorityString)\(recurrenceString)"
 }
@@ -728,6 +729,7 @@ public final class Reminders {
         onListNamedOrId nameOrId: String,
         newText: String?,
         newNotes: String?,
+        clearNotes: Bool = false,
         newDueDateComponents: DateComponents? = nil,
         clearDueDate: Bool = false,
         priority: Priority? = nil,
@@ -754,7 +756,11 @@ public final class Reminders {
 
             do {
                 reminder.title = newText ?? reminder.title
-                reminder.notes = newNotes ?? reminder.notes
+                if clearNotes {
+                    reminder.notes = nil
+                } else {
+                    reminder.notes = newNotes ?? reminder.notes
+                }
                 if clearPriority {
                     reminder.priority = Int(EKReminderPriority.none.rawValue)
                 } else if let priority {

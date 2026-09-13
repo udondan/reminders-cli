@@ -401,6 +401,9 @@ private struct Edit: ParsableCommand {
         help: "The notes to set on the reminder, overwriting previous notes")
     var notes: String?
 
+    @Flag(help: "Remove the notes from the reminder")
+    var clearNotes = false
+
     @Option(
         name: [.customLong("repeat")],
         help: "Set (or replace) the reminder's repeat, one of: daily, weekly, monthly, yearly")
@@ -451,17 +454,20 @@ private struct Edit: ParsableCommand {
         if self.priority != nil && self.clearPriority {
             throw ValidationError("Cannot specify both --priority and --clear-priority")
         }
+        if self.notes != nil && self.clearNotes {
+            throw ValidationError("Cannot specify both --notes and --clear-notes")
+        }
 
         let changesRecurrence = self.repeat_ != nil || self.repeatInterval != nil
             || self.repeatUntil != nil || self.clearRepeatEnd
 
-        if self.reminder.isEmpty && self.notes == nil && self.dueDate == nil
+        if self.reminder.isEmpty && self.notes == nil && !self.clearNotes && self.dueDate == nil
             && !self.clearDueDate && !changesRecurrence && !self.clearRepeat
             && self.priority == nil && !self.clearPriority && self.list == nil
         {
             throw ValidationError(
-                "Must specify new reminder content, new notes, a due date change, a repeat change, "
-                    + "a priority change, or a new list")
+                "Must specify new reminder content, a notes change, a due date change, "
+                    + "a repeat change, a priority change, or a new list")
         }
         if self.clearRepeat && changesRecurrence {
             throw ValidationError("Cannot combine --clear-repeat with another repeat option")
@@ -490,6 +496,7 @@ private struct Edit: ParsableCommand {
             onListNamedOrId: self.listNameOrId,
             newText: newText.isEmpty ? nil : newText,
             newNotes: self.notes,
+            clearNotes: self.clearNotes,
             newDueDateComponents: self.dueDate,
             clearDueDate: self.clearDueDate,
             priority: self.priority,

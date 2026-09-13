@@ -33,7 +33,10 @@ extension EKReminder: @retroactive Encodable {
         try container.encode(self.priority, forKey: .priority)
         try container.encode(self.calendar.title, forKey: .list)
         try container.encode(self.calendar.calendarIdentifier, forKey: .listId)
-        try container.encodeIfPresent(self.notes, forKey: .notes)
+        // EventKit stores cleared notes as "" rather than nil; both mean "no notes".
+        if let notes = self.notes, !notes.isEmpty {
+            try container.encode(notes, forKey: .notes)
+        }
 
         // url field is nil
         // https://developer.apple.com/forums/thread/128140
