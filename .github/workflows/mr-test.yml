@@ -23,10 +23,10 @@ jobs:
         with:
           filters: |
             code:
-              - 'Sources/**'
-              - 'Tests/**'
-              - 'Package.swift'
-              - 'Package.resolved'
+              - Sources/**
+              - Tests/**
+              - Package.swift
+              - Package.resolved
 
       - name: xcode-select
         if: steps.changes.outputs.code == 'true'
