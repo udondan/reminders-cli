@@ -51,14 +51,13 @@ extension EKReminder {
     }
 }
 
-private func format(_ reminder: EKReminder, at index: Int?, listName: String? = nil) -> String {
+private func format(_ reminder: EKReminder, id: String, listName: String? = nil) -> String {
     let dateString = formattedDueDate(from: reminder).map { " (\($0))" } ?? ""
     let priorityString = Priority(reminder.mappedPriority).map { " (priority: \($0))" } ?? ""
     let listString = listName.map { "\($0): " } ?? ""
     let notesString = reminder.notes.map { " (\($0))" } ?? ""
-    let indexString = index.map { "\($0): " } ?? ""
     let recurrenceString = formattedRecurrence(from: reminder).map { " (\($0))" } ?? ""
-    return "\(listString)\(indexString)\(reminder.title ?? "<unknown>")\(notesString)\(dateString)\(priorityString)\(recurrenceString)"
+    return "\(listString)\(id): \(reminder.title ?? "<unknown>")\(notesString)\(dateString)\(priorityString)\(recurrenceString)"
 }
 
 // Additional, independently-composable filters for `show`/`show-all`, ANDed together and ANDed
@@ -536,10 +535,10 @@ public final class Reminders {
         let calendars = lists.isEmpty ? self.getCalendars() : lists.map { self.calendar(withNameOrId: $0) }
 
         self.reminders(on: calendars, displayOptions: displayOptions) { reminders in
-            var matchingReminders = [(EKReminder, Int?, String)]()
+            var matchingReminders = [(EKReminder, String, String)]()
             let reminders = sort == .none ? reminders : reminders.sorted(by: sort.sortFunction(order: sortOrder))
-            for (i, reminder) in reminders.enumerated() {
-                let index = sort == .none ? i : nil
+            for reminder in reminders {
+                let id = reminder.calendarItemExternalIdentifier ?? "<unknown-id>"
                 let listName = reminder.calendar.title
 
                 let matchesExistingDueDateFilter: Bool
@@ -567,15 +566,15 @@ public final class Reminders {
                     continue
                 }
 
-                matchingReminders.append((reminder, index, listName))
+                matchingReminders.append((reminder, id, listName))
             }
 
             switch outputFormat {
             case .json:
                 print(encodeToJson(data: matchingReminders.map { $0.0 }))
             case .plain:
-                for (reminder, i, listName) in matchingReminders {
-                    print(format(reminder, at: i, listName: listName))
+                for (reminder, id, listName) in matchingReminders {
+                    print(format(reminder, id: id, listName: listName))
                 }
             }
 
@@ -601,10 +600,10 @@ public final class Reminders {
         let completedSinceDate = completedSince?.date
 
         self.reminders(on: [reminderCalendar], displayOptions: displayOptions) { reminders in
-            var matchingReminders = [(EKReminder, Int?)]()
+            var matchingReminders = [(EKReminder, String)]()
             let reminders = sort == .none ? reminders : reminders.sorted(by: sort.sortFunction(order: sortOrder))
-            for (i, reminder) in reminders.enumerated() {
-                let index = sort == .none ? i : nil
+            for reminder in reminders {
+                let id = reminder.calendarItemExternalIdentifier ?? "<unknown-id>"
 
                 let matchesExistingDueDateFilter: Bool
                 if let dueDate = dueDate?.date {
@@ -631,15 +630,15 @@ public final class Reminders {
                     continue
                 }
 
-                matchingReminders.append((reminder, index))
+                matchingReminders.append((reminder, id))
             }
 
             switch outputFormat {
             case .json:
                 print(encodeToJson(data: matchingReminders.map { $0.0 }))
             case .plain:
-                for (reminder, i) in matchingReminders {
-                    print(format(reminder, at: i))
+                for (reminder, id) in matchingReminders {
+                    print(format(reminder, id: id))
                 }
             }
 
@@ -691,7 +690,7 @@ public final class Reminders {
     }
 
     func edit(
-        itemAtIndexOrId indexOrId: String,
+        itemAtId id: String,
         onListNamedOrId nameOrId: String,
         newText: String?,
         newNotes: String?,
@@ -714,8 +713,8 @@ public final class Reminders {
             || clearRecurrenceEnd
 
         self.reminders(on: [calendar], displayOptions: .incomplete) { reminders in
-            guard let reminder = self.getReminder(from: reminders, atIndexOrId: indexOrId) else {
-                print("No reminder at index or with ID \(indexOrId) on \(nameOrId)")
+            guard let reminder = self.getReminder(from: reminders, withId: id) else {
+                print("No reminder with ID \(id) on \(nameOrId)")
                 exit(1)
             }
 
@@ -814,7 +813,7 @@ public final class Reminders {
     }
 
     func postpone(
-        itemAtIndexOrId indexOrId: String,
+        itemAtId id: String,
         onListNamedOrId nameOrId: String,
         to newDueDateComponents: DateComponents?,
         toNextWeekday: Bool,
@@ -824,8 +823,8 @@ public final class Reminders {
         let semaphore = DispatchSemaphore(value: 0)
 
         self.reminders(on: [calendar], displayOptions: .incomplete) { reminders in
-            guard let reminder = self.getReminder(from: reminders, atIndexOrId: indexOrId) else {
-                print("No reminder at index or with ID \(indexOrId) on \(nameOrId)")
+            guard let reminder = self.getReminder(from: reminders, withId: id) else {
+                print("No reminder with ID \(id) on \(nameOrId)")
                 exit(1)
             }
 
@@ -875,14 +874,14 @@ public final class Reminders {
         semaphore.wait()
     }
 
-    func setComplete(_ complete: Bool, itemAtIndexOrId indexOrId: String, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) {
+    func setComplete(_ complete: Bool, itemAtId id: String, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) {
         let calendar = self.calendar(withNameOrId: nameOrId)
         let semaphore = DispatchSemaphore(value: 0)
         let action = complete ? "Completed" : "Uncompleted"
 
         self.reminders(on: [calendar], displayOptions: complete ? .incomplete : .complete) { reminders in
-            guard let reminder = self.getReminder(from: reminders, atIndexOrId: indexOrId) else {
-                print("No reminder at index or with ID \(indexOrId) on \(nameOrId)")
+            guard let reminder = self.getReminder(from: reminders, withId: id) else {
+                print("No reminder with ID \(id) on \(nameOrId)")
                 exit(1)
             }
 
@@ -905,23 +904,15 @@ public final class Reminders {
         semaphore.wait()
     }
 
-    func delete(itemAtIndexOrId indexOrId: String, onListNamedOrId nameOrId: String) {
+    func delete(itemAtId id: String, onListNamedOrId nameOrId: String) {
         let calendar = self.calendar(withNameOrId: nameOrId)
         let semaphore = DispatchSemaphore(value: 0)
 
-        // Numeric indexes are only meaningful against the same display set that
-        // `show` uses by default (incomplete-only), so keep that scope when the
-        // caller passes a plain integer index — otherwise a numeric index would
-        // resolve against a differently-ordered/sized array than the one the
-        // user actually saw. External identifiers are stable regardless of
-        // completion state, so widen the fetch to `.all` in that case, so a
-        // reminder already marked complete can still be found and deleted by
-        // its id instead of failing with "No reminder at index ...".
-        let displayOptions: DisplayOptions = Int(indexOrId) == nil ? .all : .incomplete
-
-        self.reminders(on: [calendar], displayOptions: displayOptions) { reminders in
-            guard let reminder = self.getReminder(from: reminders, atIndexOrId: indexOrId) else {
-                print("No reminder at index or with ID \(indexOrId) on \(nameOrId)")
+        // External identifiers are stable regardless of completion state, so a
+        // reminder already marked complete can still be found and deleted by its id.
+        self.reminders(on: [calendar], displayOptions: .all) { reminders in
+            guard let reminder = self.getReminder(from: reminders, withId: id) else {
+                print("No reminder with ID \(id) on \(nameOrId)")
                 exit(1)
             }
 
@@ -1019,12 +1010,8 @@ public final class Reminders {
 
     // Kept internal (not private) so it's directly unit-testable via `@testable import`,
     // matching `matchesAdditionalFilters` above.
-    func getReminder(from reminders: [EKReminder], atIndexOrId indexOrId: String) -> EKReminder? {
-        if let index = Int(indexOrId) {
-            return reminders[safe: index]
-        } else {
-            return reminders.first { $0.calendarItemExternalIdentifier == indexOrId }
-        }
+    func getReminder(from reminders: [EKReminder], withId id: String) -> EKReminder? {
+        return reminders.first { $0.calendarItemExternalIdentifier == id }
     }
 
 }

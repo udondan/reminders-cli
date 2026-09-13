@@ -30,11 +30,10 @@ Execution flows in one direction through four layers:
    - `NaturalLanguage.swift` — `DateComponents(argument:)` (`ExpressibleByArgument`), parses natural-language date strings like `"tomorrow 9am"` for `--due-date` options via `NSDataDetector`. Known limitation: `"next weekend"` doesn't parse (Apple Feedback FB8921206), covered by a test expecting `nil`.
    - `Sort.swift` — `Sort`/`CustomSortOrder` enums backing `show --sort`/`--sort-order`.
    - `EKReminder+Encodable.swift` — manual `Encodable` conformance for `EKReminder`, used for `--format json` output.
-   - `CollectionType+Extension.swift` — small `Collection` helpers (`find(where:)`, safe subscript) used by `Reminders.swift`.
 
 When adding a new subcommand: add a `ParsableCommand` struct in `CLI.swift`, register it in `CLI`'s `subcommands`, and implement the actual behavior as a method on `Reminders` in `Reminders.swift` — keep `CLI.swift` limited to argument parsing/dispatch.
 
-Tests (`Tests/RemindersTests/NaturalLanguageTests.swift`) currently only cover natural-language date parsing, via `XCTest` + `@testable import RemindersLibrary`.
+Reminder items are looked up only by their stable `calendarItemExternalIdentifier` (never by list position) via `Reminders.getReminder(from:withId:)`, exercised directly in `Tests/RemindersTests/IdentifierTests.swift` (via `@testable import RemindersLibrary`) alongside `Tests/RemindersTests/NaturalLanguageTests.swift`'s natural-language date parsing tests.
 
 ## Release process
 

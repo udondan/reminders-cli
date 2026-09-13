@@ -22,17 +22,22 @@ command line.
 
 ```
 $ reminders show Soon
-0 Write README
-1 Ship reminders-cli
+2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 ```
+
+Each reminder's own stable identifier is shown as the leading prefix — the same kind of ID as the
+list identifiers above. This is what you pass to `complete`, `uncomplete`, `edit`, `postpone`, and
+`delete` to act on a specific reminder; unlike a list position, it keeps pointing at the same
+reminder even if the list changes in between.
 
 #### Complete an item on a list
 
 ```
-$ reminders complete Soon 0
+$ reminders complete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C
 Completed 'Write README'
 $ reminders show Soon
-0 Ship reminders-cli
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 ```
 
 `complete`, `uncomplete`, and `edit` also accept `--format json` to print the affected reminder as
@@ -42,43 +47,43 @@ JSON instead of the plain-text confirmation shown above.
 
 ```
 $ reminders show Soon --only-completed
-0 Write README
-$ reminders uncomplete Soon 0
+2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
+$ reminders uncomplete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C
 Uncompleted 'Write README'
 $ reminders show Soon
-0 Write README
+2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
 ```
 
 #### Edit an item on a list
 
 ```
-$ reminders edit Soon 0 Some edited text
+$ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C Some edited text
 Updated reminder 'Some edited text'
-$ reminders edit Soon 0 --due-date "tomorrow 9am"
+$ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --due-date "tomorrow 9am"
 Updated reminder 'Some edited text'
-$ reminders edit Soon 0 --clear-due-date
+$ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --clear-due-date
 Updated reminder 'Some edited text'
 $ reminders show Soon
-0 Ship reminders-cli
-1 Some edited text
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
+2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Some edited text
 ```
 
 Set or clear a reminder's priority:
 
 ```
-$ reminders edit Soon 0 --priority high
+$ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --priority high
 Updated reminder 'Some edited text'
-$ reminders edit Soon 0 --clear-priority
+$ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --clear-priority
 Updated reminder 'Some edited text'
 ```
 
 Move a reminder to a different list:
 
 ```
-$ reminders edit Soon 0 --list "Some Other List"
+$ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --list "Some Other List"
 Updated reminder 'Some edited text'
 $ reminders show "Some Other List"
-0 Some edited text
+2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Some edited text
 ```
 
 #### Postpone a reminder
@@ -86,14 +91,14 @@ $ reminders show "Some Other List"
 Set a specific new due date; any existing repeat rule is left completely unchanged:
 
 ```
-$ reminders postpone Soon 0 "next monday 9am"
+$ reminders postpone Soon B9D4E8A7-6FAC-4D3B-EA87-1C2E5F607182 "next monday 9am"
 Postponed reminder 'Water the plants'
 ```
 
 Or shift it to the next weekday, preserving its time of day:
 
 ```
-$ reminders postpone Soon 0 --next-weekday
+$ reminders postpone Soon B9D4E8A7-6FAC-4D3B-EA87-1C2E5F607182 --next-weekday
 Postponed reminder 'Water the plants'
 ```
 
@@ -105,21 +110,14 @@ have a due date.
 #### Delete an item on a list
 
 ```
-$ reminders delete Soon 0
-Completed 'Write README'
-$ reminders show Soon
-0 Ship reminders-cli
-```
-
-The index argument above only matches against incomplete reminders, the same set `show` displays
-by default. To delete a reminder that's already been completed, pass its ID (from `show
---only-completed --format json`, or the `externalId` field) instead of an index — an ID is looked
-up regardless of completion state:
-
-```
-$ reminders delete Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17
+$ reminders delete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C
 Deleted 'Write README'
+$ reminders show Soon
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 ```
+
+`delete` looks a reminder up by ID regardless of its completion state, so a reminder that's already
+been completed can be deleted the same way, without any special-casing.
 
 #### Add a reminder to a list
 
@@ -128,10 +126,10 @@ $ reminders add Soon Contribute to open source
 $ reminders add Soon Go to the grocery store --due-date "tomorrow 9am"
 $ reminders add Soon Something really important --priority high
 $ reminders show Soon
-0: Ship reminders-cli
-1: Contribute to open source
-2: Go to the grocery store (in 10 hours)
-3: Something really important (priority: high)
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
+B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source
+C4E9F3B2-1A5D-4E8C-9B32-6D7F0A1B2C3D: Go to the grocery store (in 10 hours)
+D5F0A4C3-2B6E-4F9D-AC43-7E8A1B2C3D4E: Something really important (priority: high)
 ```
 
 #### Add a repeating reminder
@@ -153,10 +151,10 @@ default. A date without a time includes the whole local day. On `add`, recurrenc
 To change or remove a repeat rule on an existing reminder, use `edit`:
 
 ```
-$ reminders edit Soon 0 --repeat monthly
-$ reminders edit Soon 0 --repeat-until "2027-09-01"
-$ reminders edit Soon 0 --clear-repeat-end
-$ reminders edit Soon 0 --clear-repeat
+$ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat monthly
+$ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat-until "2027-09-01"
+$ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat-end
+$ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat
 ```
 
 Changing only the interval or end condition preserves the existing frequency and any complex
@@ -183,15 +181,15 @@ rather than guess.
 
 ```
 $ reminders show-all --due-date today
-1: Contribute to open source (in 3 hours)
+B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 $ reminders show-all --due-date today --include-overdue
-0: Ship reminders-cli (2 days ago)
-1: Contribute to open source (in 3 hours)
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
+B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 $ reminders show-all --due-date 2025-02-16
-1: Contribute to open source (in 3 hours)
+B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 $ reminders show Soon --due-date today --include-overdue
-0: Ship reminders-cli (2 days ago)
-1: Contribute to open source (in 3 hours)
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
+B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 ```
 
 #### Filter reminders
@@ -201,22 +199,22 @@ applied identically to `--format plain` and `--format json`):
 
 ```
 $ reminders show-all --overdue
-0: Ship reminders-cli (2 days ago)
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
 $ reminders show-all --due-before "in 7 days"
-1: Contribute to open source (in 3 hours)
+B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 $ reminders show-all --due-after "in 7 days"
-2: Renew passport (in 2 weeks)
+E6A1B5D4-3C7F-4A0E-BD54-8F9B2C3D4E5F: Renew passport (in 2 weeks)
 $ reminders show-all --no-due-date
-3: Read a book
+F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book
 $ reminders show-all --priority high --priority medium
-0: Ship reminders-cli (2 days ago)
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
 $ reminders show-all --search groceries
-4: Buy groceries
+A8C3D7F6-5E9B-4C2A-DF76-0B1D4E5F6071: Buy groceries
 $ reminders show-all --list Soon --list Work
-0: Ship reminders-cli (2 days ago)
-1: Contribute to open source (in 3 hours)
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
+B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 $ reminders show-all --include-completed --completed-since monday
-5: Write README
+2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
 ```
 
 `--priority` and `--list` may be repeated to match any of several values. `--list` restricts which
@@ -234,26 +232,25 @@ bound against each reminder's completion time, and requires `--only-completed` o
 #### Sort reminders
 
 `show` and `show-all` support `--sort`, one of `none` (default), `creation-date`, `due-date`, or
-`priority`, and `--sort-order`, one of `ascending` (default) or `descending`. Note that whenever
-`--sort` is anything other than `none`, the leading index normally used with `complete`/`edit`/
-`delete` is omitted from plain output, since it no longer reflects each reminder's position in its
-list:
+`priority`, and `--sort-order`, one of `ascending` (default) or `descending`. Each reminder's ID is
+always shown as the leading prefix, regardless of `--sort`, since it identifies the reminder rather
+than its position in the list:
 
 ```
 $ reminders show-all --sort due-date
-Soon: Contribute to open source (in 3 hours)
-Work: Renew passport (in 2 weeks)
-Eventually: Read a book
+Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+Work: E6A1B5D4-3C7F-4A0E-BD54-8F9B2C3D4E5F: Renew passport (in 2 weeks)
+Eventually: F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book
 $ reminders show-all --sort priority
-Soon: Ship reminders-cli (priority: high)
-Work: Prepare slides (priority: medium)
-Eventually: Read a book (priority: low)
-Soon: Contribute to open source (in 3 hours)
+Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (priority: high)
+Work: CAE5F9B8-70BD-4E4C-FB98-2D3F60718293: Prepare slides (priority: medium)
+Eventually: F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book (priority: low)
+Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 $ reminders show-all --sort priority --sort-order descending
-Soon: Contribute to open source (in 3 hours)
-Eventually: Read a book (priority: low)
-Work: Prepare slides (priority: medium)
-Soon: Ship reminders-cli (priority: high)
+Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+Eventually: F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book (priority: low)
+Work: CAE5F9B8-70BD-4E4C-FB98-2D3F60718293: Prepare slides (priority: medium)
+Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (priority: high)
 ```
 
 `--sort priority` orders high before medium before low before no-priority reminders in ascending
