@@ -84,4 +84,31 @@ final class IdentifierTests: XCTestCase {
         let reminder = makeReminder(calendar: calendar)
         XCTAssertNil(Reminders().getReminder(from: [reminder], withId: "not-a-real-id"))
     }
+
+    // MARK: - Throwing lookups
+
+    func testResolveCalendarThrowsListNotFound() throws {
+        let a = makeCalendar(title: "Groceries")
+        let missing = UUID().uuidString
+        XCTAssertThrowsError(try resolveCalendar([a], nameOrId: missing)) { error in
+            XCTAssertEqual(error as? CLIError, .listNotFound(missing))
+        }
+    }
+
+    func testResolveCalendarReturnsMatch() throws {
+        let a = makeCalendar(title: "Groceries")
+        let resolved = try resolveCalendar([a], nameOrId: "groceries")
+        XCTAssertEqual(resolved.calendarIdentifier, a.calendarIdentifier)
+    }
+
+    func testReminderLookupThrowsReminderNotFound() throws {
+        let calendar = makeCalendar(title: "List")
+        let reminder = makeReminder(calendar: calendar)
+        XCTAssertThrowsError(
+            try Reminders().reminder(withId: "not-a-real-id", in: [reminder], onList: "List")
+        ) { error in
+            XCTAssertEqual(
+                error as? CLIError, .reminderNotFound(id: "not-a-real-id", listNameOrId: "List"))
+        }
+    }
 }

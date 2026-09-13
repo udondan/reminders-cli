@@ -3,7 +3,13 @@ import Foundation
 
 private let reminders = Reminders()
 
-private struct ShowLists: ParsableCommand {
+/// Every subcommand exposes its `--format` so the central error handler in `CLI.execute()`
+/// can render a `CLIError` the same way the command would have rendered its output.
+protocol FormattedCommand: ParsableCommand {
+    var format: OutputFormat { get }
+}
+
+private struct ShowLists: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Print the name of lists to pass to other commands")
     @Option(
@@ -16,12 +22,12 @@ private struct ShowLists: ParsableCommand {
         help: "show only the default Reminders list")
     var defaultOnly: Bool = false
 
-    func run() {
-        reminders.showLists(outputFormat: format, defaultOnly: defaultOnly)
+    func run() throws {
+        try reminders.showLists(outputFormat: format, defaultOnly: defaultOnly)
     }
 }
 
-private struct ShowAll: ParsableCommand {
+private struct ShowAll: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Print all reminders")
 
@@ -96,7 +102,7 @@ private struct ShowAll: ParsableCommand {
         }
     }
 
-    func run() {
+    func run() throws {
         var displayOptions = DisplayOptions.incomplete
         if self.onlyCompleted {
             displayOptions = .complete
@@ -104,7 +110,7 @@ private struct ShowAll: ParsableCommand {
             displayOptions = .all
         }
 
-        reminders.showAllReminders(
+        try reminders.showAllReminders(
             dueOn: self.dueDate, includeOverdue: self.includeOverdue,
             overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
             noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
@@ -113,7 +119,7 @@ private struct ShowAll: ParsableCommand {
     }
 }
 
-private struct Show: ParsableCommand {
+private struct Show: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Print the items on the given list")
 
@@ -190,7 +196,7 @@ private struct Show: ParsableCommand {
         }
     }
 
-    func run() {
+    func run() throws {
         var displayOptions = DisplayOptions.incomplete
         if self.onlyCompleted {
             displayOptions = .complete
@@ -198,7 +204,7 @@ private struct Show: ParsableCommand {
             displayOptions = .all
         }
 
-        reminders.showListItems(
+        try reminders.showListItems(
             withNameOrId: self.listNameOrId, dueOn: self.dueDate, includeOverdue: self.includeOverdue,
             overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
             noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
@@ -207,7 +213,7 @@ private struct Show: ParsableCommand {
     }
 }
 
-private struct Add: ParsableCommand {
+private struct Add: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Add a reminder to a list")
 
@@ -281,8 +287,8 @@ private struct Add: ParsableCommand {
         }
     }
 
-    func run() {
-        reminders.addReminder(
+    func run() throws {
+        try reminders.addReminder(
             string: self.reminder.joined(separator: " "),
             notes: self.notes,
             toListNameOrId: self.listNameOrId,
@@ -295,7 +301,7 @@ private struct Add: ParsableCommand {
     }
 }
 
-private struct Complete: ParsableCommand {
+private struct Complete: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Complete a reminder")
 
@@ -313,14 +319,14 @@ private struct Complete: ParsableCommand {
         help: "Output format (plain or json)")
     var format: OutputFormat = .plain
 
-    func run() {
-        reminders.setComplete(true, itemAtId: self.id,
+    func run() throws {
+        try reminders.setComplete(true, itemAtId: self.id,
                             onListNamedOrId: self.listNameOrId,
                             outputFormat: format)
     }
 }
 
-private struct Uncomplete: ParsableCommand {
+private struct Uncomplete: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Uncomplete a reminder")
 
@@ -338,14 +344,14 @@ private struct Uncomplete: ParsableCommand {
         help: "Output format (plain or json)")
     var format: OutputFormat = .plain
 
-    func run() {
-        reminders.setComplete(false, itemAtId: self.id,
+    func run() throws {
+        try reminders.setComplete(false, itemAtId: self.id,
                             onListNamedOrId: self.listNameOrId,
                             outputFormat: format)
     }
 }
 
-private struct Delete: ParsableCommand {
+private struct Delete: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Delete a reminder")
 
@@ -358,8 +364,13 @@ private struct Delete: ParsableCommand {
         help: "The id of the reminder to delete, see 'show' for IDs")
     var id: String
 
-    func run() {
-        reminders.delete(itemAtId: self.id, onListNamedOrId: self.listNameOrId)
+    @Option(
+        name: .shortAndLong,
+        help: "Output format (plain or json)")
+    var format: OutputFormat = .plain
+
+    func run() throws {
+        try reminders.delete(itemAtId: self.id, onListNamedOrId: self.listNameOrId, outputFormat: format)
     }
 }
 
@@ -369,7 +380,7 @@ func listNameCompletion(_ arguments: [String], _ position: Int, _ prefix: String
     return reminders.getListNames().map { $0.replacingOccurrences(of: ":", with: "\\:") }
 }
 
-private struct Edit: ParsableCommand {
+private struct Edit: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Edit the text of a reminder")
 
@@ -489,9 +500,9 @@ private struct Edit: ParsableCommand {
         }
     }
 
-    func run() {
+    func run() throws {
         let newText = self.reminder.joined(separator: " ")
-        reminders.edit(
+        try reminders.edit(
             itemAtId: self.id,
             onListNamedOrId: self.listNameOrId,
             newText: newText.isEmpty ? nil : newText,
@@ -512,7 +523,7 @@ private struct Edit: ParsableCommand {
     }
 }
 
-private struct Postpone: ParsableCommand {
+private struct Postpone: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Move a reminder's due date without changing its repeat rule")
 
@@ -548,8 +559,8 @@ private struct Postpone: ParsableCommand {
         }
     }
 
-    func run() {
-        reminders.postpone(
+    func run() throws {
+        try reminders.postpone(
             itemAtId: self.id,
             onListNamedOrId: self.listNameOrId,
             to: self.date,
@@ -560,7 +571,7 @@ private struct Postpone: ParsableCommand {
 }
 
 
-private struct NewList: ParsableCommand {
+private struct NewList: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Create a new list")
 
@@ -573,8 +584,52 @@ private struct NewList: ParsableCommand {
         help: "The name of the source of the list, if all your lists use the same source it will default to that")
     var source: String?
 
-    func run() {
-        reminders.newList(with: self.listName, source: self.source)
+    @Option(
+        name: .shortAndLong,
+        help: "Output format (plain or json)")
+    var format: OutputFormat = .plain
+
+    func run() throws {
+        try reminders.newList(with: self.listName, source: self.source, outputFormat: format)
+    }
+}
+
+/// What happened when a command was run in-process, so tests can assert on it without the
+/// process exiting.
+enum CLIRunOutcome: Equatable {
+    case completed
+    case failed(CLIError, format: OutputFormat)
+}
+
+extension CLI {
+    /// Parses and runs one command. A `CLIError` thrown by the command is returned together
+    /// with the `--format` the user asked for; every other error (help, version, validation
+    /// errors, ...) is rethrown so ArgumentParser's `exit(withError:)` handles it as before.
+    static func runCommand(_ arguments: [String]? = nil) throws -> CLIRunOutcome {
+        var command = try parseAsRoot(arguments)
+        do {
+            try command.run()
+        } catch let error as CLIError {
+            let format = (command as? FormattedCommand)?.format ?? .plain
+            return .failed(error, format: format)
+        }
+        return .completed
+    }
+
+    /// Drop-in replacement for `CLI.main()`: the single place where a `CLIError` is written to
+    /// stderr and turned into its exit status.
+    public static func execute() {
+        do {
+            switch try runCommand() {
+            case .completed:
+                return
+            case .failed(let error, let format):
+                error.report(format: format)
+                Self.exit(withError: error.exitCode)
+            }
+        } catch {
+            Self.exit(withError: error)
+        }
     }
 }
 
