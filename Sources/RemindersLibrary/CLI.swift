@@ -300,8 +300,8 @@ private struct Complete: ParsableCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The index or id of the reminder to delete, see 'show' for indexes and IDs")
-    var indexOrId: String
+        help: "The id of the reminder to complete, see 'show' for IDs")
+    var id: String
 
     @Option(
         name: .shortAndLong,
@@ -309,7 +309,7 @@ private struct Complete: ParsableCommand {
     var format: OutputFormat = .plain
 
     func run() {
-        reminders.setComplete(true, itemAtIndexOrId: self.indexOrId,
+        reminders.setComplete(true, itemAtId: self.id,
                             onListNamedOrId: self.listNameOrId,
                             outputFormat: format)
     }
@@ -325,8 +325,8 @@ private struct Uncomplete: ParsableCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The index or id of the reminder to delete, see 'show' for indexes and IDs")
-    var indexOrId: String
+        help: "The id of the reminder to uncomplete, see 'show' for IDs")
+    var id: String
 
     @Option(
         name: .shortAndLong,
@@ -334,7 +334,7 @@ private struct Uncomplete: ParsableCommand {
     var format: OutputFormat = .plain
 
     func run() {
-        reminders.setComplete(false, itemAtIndexOrId: self.indexOrId,
+        reminders.setComplete(false, itemAtId: self.id,
                             onListNamedOrId: self.listNameOrId,
                             outputFormat: format)
     }
@@ -350,11 +350,11 @@ private struct Delete: ParsableCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The index or id of the reminder to delete, see 'show' for indexes and IDs")
-    var indexOrId: String
+        help: "The id of the reminder to delete, see 'show' for IDs")
+    var id: String
 
     func run() {
-        reminders.delete(itemAtIndexOrId: self.indexOrId, onListNamedOrId: self.listNameOrId)
+        reminders.delete(itemAtId: self.id, onListNamedOrId: self.listNameOrId)
     }
 }
 
@@ -374,8 +374,8 @@ private struct Edit: ParsableCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The index or id of the reminder to delete, see 'show' for indexes and IDs")
-    var indexOrId: String
+        help: "The id of the reminder to edit, see 'show' for IDs")
+    var id: String
 
     @Option(
         name: .shortAndLong,
@@ -481,7 +481,7 @@ private struct Edit: ParsableCommand {
     func run() {
         let newText = self.reminder.joined(separator: " ")
         reminders.edit(
-            itemAtIndexOrId: self.indexOrId,
+            itemAtId: self.id,
             onListNamedOrId: self.listNameOrId,
             newText: newText.isEmpty ? nil : newText,
             newNotes: self.notes,
@@ -510,8 +510,8 @@ private struct Postpone: ParsableCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The index or id of the reminder to postpone, see 'show' for indexes and IDs")
-    var indexOrId: String
+        help: "The id of the reminder to postpone, see 'show' for IDs")
+    var id: String
 
     @Argument(
         help: "The new due date for the reminder; omit this when using --next-weekday")
@@ -538,7 +538,7 @@ private struct Postpone: ParsableCommand {
 
     func run() {
         reminders.postpone(
-            itemAtIndexOrId: self.indexOrId,
+            itemAtId: self.id,
             onListNamedOrId: self.listNameOrId,
             to: self.date,
             toNextWeekday: self.nextWeekday,

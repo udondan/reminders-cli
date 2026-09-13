@@ -71,31 +71,17 @@ final class IdentifierTests: XCTestCase {
 
     // MARK: - Reminder resolution
 
-    func testGetReminderResolvesByIndexForNumericString() throws {
-        let calendar = makeCalendar(title: "List")
-        let first = makeReminder(title: "First", calendar: calendar)
-        let second = makeReminder(title: "Second", calendar: calendar)
-        let resolved = Reminders().getReminder(from: [first, second], atIndexOrId: "1")
-        XCTAssertEqual(resolved?.title, "Second")
-    }
-
-    func testGetReminderResolvesByExternalIdForNonNumericString() throws {
+    func testGetReminderResolvesById() throws {
         let calendar = makeCalendar(title: "List")
         let reminder = makeReminder(title: "Only", calendar: calendar)
         let resolved = Reminders().getReminder(
-            from: [reminder], atIndexOrId: reminder.calendarItemExternalIdentifier)
+            from: [reminder], withId: reminder.calendarItemExternalIdentifier)
         XCTAssertEqual(resolved?.title, "Only")
     }
 
-    func testGetReminderReturnsNilForOutOfRangeIndex() throws {
+    func testGetReminderReturnsNilForUnknownId() throws {
         let calendar = makeCalendar(title: "List")
         let reminder = makeReminder(calendar: calendar)
-        XCTAssertNil(Reminders().getReminder(from: [reminder], atIndexOrId: "5"))
-    }
-
-    func testGetReminderReturnsNilForUnknownExternalId() throws {
-        let calendar = makeCalendar(title: "List")
-        let reminder = makeReminder(calendar: calendar)
-        XCTAssertNil(Reminders().getReminder(from: [reminder], atIndexOrId: "not-a-real-id"))
+        XCTAssertNil(Reminders().getReminder(from: [reminder], withId: "not-a-real-id"))
     }
 }
