@@ -106,6 +106,19 @@ func matchesAdditionalFilters(
     return true
 }
 
+// Resolves a list argument that may be either a `calendarIdentifier` or a (case-insensitive)
+// list title. ID matches take precedence, so a title that happens to collide with another
+// list's ID still resolves to the list with that ID. Kept as a free function, separate from
+// `Reminders.calendar(withNameOrId:)`, so it's directly unit-testable via `@testable import`
+// without needing live access to Reminders.app, matching `matchesAdditionalFilters` above.
+func calendarMatching(_ calendars: [EKCalendar], nameOrId: String) -> EKCalendar? {
+    if let calendar = calendars.first(where: { $0.calendarIdentifier == nameOrId }) {
+        return calendar
+    } else {
+        return calendars.first { $0.title.lowercased() == nameOrId.lowercased() }
+    }
+}
+
 public enum OutputFormat: String, ExpressibleByArgument {
     case json, plain
 }
@@ -882,9 +895,7 @@ public final class Reminders {
     }
 
     private func calendar(withNameOrId nameOrId: String) -> EKCalendar {
-        if let calendar = self.getCalendars().first(where: { $0.calendarIdentifier == nameOrId }) {
-            return calendar
-        } else if let calendar = self.getCalendars().first(where: { $0.title.lowercased() == nameOrId.lowercased() }) {
+        if let calendar = calendarMatching(self.getCalendars(), nameOrId: nameOrId) {
             return calendar
         } else {
             print("No reminders list matching \(nameOrId)")
@@ -897,7 +908,9 @@ public final class Reminders {
                     .filter { $0.allowsContentModifications }
     }
 
-    private func getReminder(from reminders: [EKReminder], atIndexOrId indexOrId: String) -> EKReminder? {
+    // Kept internal (not private) so it's directly unit-testable via `@testable import`,
+    // matching `matchesAdditionalFilters` above.
+    func getReminder(from reminders: [EKReminder], atIndexOrId indexOrId: String) -> EKReminder? {
         if let index = Int(indexOrId) {
             return reminders[safe: index]
         } else {
