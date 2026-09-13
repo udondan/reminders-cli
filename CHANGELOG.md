@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.2.0](https://github.com/udondan/reminders-cli/compare/v3.1.1...v3.2.0) (2026-09-13)
+
+
+### Features
+
+* report errors as structured messages on stderr ([#55](https://github.com/udondan/reminders-cli/issues/55)) ([dca2cb6](https://github.com/udondan/reminders-cli/commit/dca2cb6dfb81ad2fc83bc8b7022bf41621015dea)), closes [#45](https://github.com/udondan/reminders-cli/issues/45)
+
 ## [3.1.1](https://github.com/udondan/reminders-cli/compare/v3.1.0...v3.1.1) (2026-09-13)
 
 
