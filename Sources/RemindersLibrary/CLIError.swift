@@ -34,11 +34,16 @@ public struct CLIError: Error, Equatable, Encodable {
 
     // MARK: - Constructors
 
-    static func listNotFound(_ nameOrId: String) -> CLIError {
-        CLIError(
+    /// `available` is the titles of every list that was searched; when known they're named in the
+    /// suggestion so the user doesn't need a second command to find the right one.
+    static func listNotFound(_ nameOrId: String, available: [String] = []) -> CLIError {
+        let suggestion = available.isEmpty
+            ? "Run 'reminders show-lists' to see available lists and their IDs"
+            : "Available lists: \(available.joined(separator: ", ")) (run 'reminders show-lists' for IDs)"
+        return CLIError(
             code: .listNotFound,
             message: "No reminders list matching '\(nameOrId)'",
-            suggestion: "Run 'reminders show-lists' to see available lists and their IDs")
+            suggestion: suggestion)
     }
 
     static func noDefaultList() -> CLIError {
@@ -48,12 +53,12 @@ public struct CLIError: Error, Equatable, Encodable {
             suggestion: "Choose a default list in Reminders.app settings")
     }
 
-    /// Reserved for when list matching becomes fuzzy; nothing produces it yet.
+    /// A list name fragment was a substring of several list titles; see `resolveCalendar`.
     static func listAmbiguous(_ nameOrId: String, matches: [String]) -> CLIError {
         CLIError(
             code: .listAmbiguous,
             message: "Multiple reminders lists match '\(nameOrId)': \(matches.joined(separator: ", "))",
-            suggestion: "Pass the list's ID instead, see 'reminders show-lists'")
+            suggestion: "Be more specific, or pass the list's ID from 'reminders show-lists'")
     }
 
     static func reminderNotFound(id: String, listNameOrId: String) -> CLIError {
@@ -63,12 +68,13 @@ public struct CLIError: Error, Equatable, Encodable {
             suggestion: "Run 'reminders show \(listNameOrId)' to see reminder IDs")
     }
 
-    /// Reserved for when reminder IDs can be given as prefixes; nothing produces it yet.
+    /// An ID prefix matched several reminders; `matches` are rendered as `<id> (<title>)` by
+    /// `resolveReminder`.
     static func reminderAmbiguous(id: String, matches: [String]) -> CLIError {
         CLIError(
             code: .reminderAmbiguous,
             message: "Multiple reminders match ID '\(id)': \(matches.joined(separator: ", "))",
-            suggestion: "Pass the full reminder ID, see 'reminders show'")
+            suggestion: "Pass a longer prefix or the full reminder ID, see 'reminders show <list>'")
     }
 
     static func noDueDate() -> CLIError {

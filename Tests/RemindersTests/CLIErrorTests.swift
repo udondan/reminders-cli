@@ -136,6 +136,22 @@ final class CLIErrorTests: XCTestCase {
         XCTAssertEqual(CLIError.noDefaultList().code, .listNotFound)
     }
 
+    func testListNotFoundNamesAvailableLists() {
+        let error = CLIError.listNotFound("Grocery", available: ["Groceries", "Work"])
+        XCTAssertEqual(error.message, "No reminders list matching 'Grocery'")
+        XCTAssertEqual(
+            error.suggestion, "Available lists: Groceries, Work (run 'reminders show-lists' for IDs)")
+    }
+
+    func testAmbiguousErrorsAreASingleLine() {
+        for error in [
+            CLIError.listAmbiguous("wor", matches: ["Work", "Work – Side projects"]),
+            CLIError.reminderAmbiguous(id: "44C1", matches: ["44C1-1 (Buy milk)", "44C1-2 (Buy eggs)"]),
+        ] {
+            XCTAssertEqual(error.rendered(format: .plain).components(separatedBy: "\n").count, 2)
+        }
+    }
+
     func testSourceAmbiguousIsASingleLine() {
         let error = CLIError.sourceAmbiguous(["iCloud", "Exchange"])
         XCTAssertEqual(error.message, "Multiple sources hold reminder lists: iCloud, Exchange")
