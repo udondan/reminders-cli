@@ -6,7 +6,7 @@ A simple CLI for interacting with OS X reminders.
 
 ### Show all lists
 
-```
+```console
 $ reminders show-lists
 Soon (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)
 Eventually (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)
@@ -20,7 +20,7 @@ command line.
 
 ### Show reminders on a specific list
 
-```
+```console
 $ reminders show Soon
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
@@ -33,9 +33,10 @@ reminder even if the list changes in between.
 
 ### Complete an item on a list
 
-```
+```console
 $ reminders complete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C
 Completed 'Write README'
+
 $ reminders show Soon
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 ```
@@ -45,24 +46,29 @@ JSON instead of the plain-text confirmation shown above.
 
 ### Undo a completed item
 
-```
+```console
 $ reminders show Soon --only-completed
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
+
 $ reminders uncomplete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C
 Uncompleted 'Write README'
+
 $ reminders show Soon
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
 ```
 
 ### Edit an item on a list
 
-```
+```console
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C Some edited text
 Updated reminder 'Some edited text'
+
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --due-date "tomorrow 9am"
 Updated reminder 'Some edited text'
+
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --clear-due-date
 Updated reminder 'Some edited text'
+
 $ reminders show Soon
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Some edited text
@@ -70,18 +76,20 @@ $ reminders show Soon
 
 Set or clear a reminder's priority:
 
-```
+```console
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --priority high
 Updated reminder 'Some edited text'
+
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --clear-priority
 Updated reminder 'Some edited text'
 ```
 
 Move a reminder to a different list:
 
-```
+```console
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --list "Some Other List"
 Updated reminder 'Some edited text'
+
 $ reminders show "Some Other List"
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Some edited text
 ```
@@ -90,28 +98,29 @@ $ reminders show "Some Other List"
 
 Set a specific new due date; any existing repeat rule is left completely unchanged:
 
-```
+```console
 $ reminders postpone Soon B9D4E8A7-6FAC-4D3B-EA87-1C2E5F607182 "next monday 9am"
 Postponed reminder 'Water the plants'
 ```
 
 Or shift it to the next weekday, preserving its time of day:
 
-```
+```console
 $ reminders postpone Soon B9D4E8A7-6FAC-4D3B-EA87-1C2E5F607182 --next-weekday
 Postponed reminder 'Water the plants'
 ```
 
 `--next-weekday` always moves the due date forward by at least one day, based on the reminder's
-*current* due date (not today), skipping Saturday and Sunday — so a reminder due Wednesday moves to
+_current_ due date (not today), skipping Saturday and Sunday — so a reminder due Wednesday moves to
 Thursday, and one due Friday moves to the following Monday. It requires the reminder to already
 have a due date.
 
 ### Delete an item on a list
 
-```
+```console
 $ reminders delete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C
 Deleted 'Write README'
+
 $ reminders show Soon
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 ```
@@ -121,10 +130,13 @@ been completed can be deleted the same way, without any special-casing.
 
 ### Add a reminder to a list
 
-```
+```console
 $ reminders add Soon Contribute to open source
+
 $ reminders add Soon Go to the grocery store --due-date "tomorrow 9am"
+
 $ reminders add Soon Something really important --priority high
+
 $ reminders show Soon
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source
@@ -134,9 +146,11 @@ D5F0A4C3-2B6E-4F9D-AC43-7E8A1B2C3D4E: Something really important (priority: high
 
 ### Add a repeating reminder
 
-```
+```console
 $ reminders add Soon Weekly review --due-date "monday 9am" --repeat weekly
+
 $ reminders add Soon Pay rent --due-date "2026-09-01" --repeat monthly --repeat-until "2027-09-01"
+
 $ reminders add Soon Water the plants --due-date "tomorrow" --repeat daily --repeat-interval 3
 ```
 
@@ -144,7 +158,7 @@ $ reminders add Soon Water the plants --due-date "tomorrow" --repeat daily --rep
   recurrence frequency, so `--repeat hourly` is rejected with an explanation rather than silently
   degrading to daily.
 - `--repeat-interval` repeats every N units instead of every 1 (e.g. `--repeat-interval 2
-  --repeat weekly` for every other week) and defaults to 1.
+--repeat weekly` for every other week) and defaults to 1.
 - `--repeat-until` stops the recurrence after a date; omitting it repeats forever, matching the
   Reminders.app default. A date without a time includes the whole local day.
 - On `add`, recurrence options require `--repeat` to also be set, and a repeating reminder
@@ -152,10 +166,13 @@ $ reminders add Soon Water the plants --due-date "tomorrow" --repeat daily --rep
 
 To change or remove a repeat rule on an existing reminder, use `edit`:
 
-```
+```console
 $ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat monthly
+
 $ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat-until "2027-09-01"
+
 $ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat-end
+
 $ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat
 ```
 
@@ -185,14 +202,17 @@ $ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat
 
 ### Show reminders due on or by a date
 
-```
+```console
 $ reminders show-all --due-date today
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show-all --due-date today --include-overdue
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show-all --due-date 2025-02-16
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show Soon --due-date today --include-overdue
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
@@ -203,22 +223,29 @@ B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 `show` and `show-all` support additional, freely combinable filters (all ANDed together, and
 applied identically to `--format plain` and `--format json`):
 
-```
+```console
 $ reminders show-all --overdue
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
+
 $ reminders show-all --due-before "in 7 days"
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show-all --due-after "in 7 days"
 E6A1B5D4-3C7F-4A0E-BD54-8F9B2C3D4E5F: Renew passport (in 2 weeks)
+
 $ reminders show-all --no-due-date
 F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book
+
 $ reminders show-all --priority high --priority medium
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
+
 $ reminders show-all --search groceries
 A8C3D7F6-5E9B-4C2A-DF76-0B1D4E5F6071: Buy groceries
+
 $ reminders show-all --list Soon --list Work
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show-all --include-completed --completed-since monday
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Write README
 ```
@@ -244,16 +271,18 @@ $ reminders show-all --include-completed --completed-since monday
 always shown as the leading prefix, regardless of `--sort`, since it identifies the reminder rather
 than its position in the list:
 
-```
+```console
 $ reminders show-all --sort due-date
 Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 Work: E6A1B5D4-3C7F-4A0E-BD54-8F9B2C3D4E5F: Renew passport (in 2 weeks)
 Eventually: F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book
+
 $ reminders show-all --sort priority
 Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (priority: high)
 Work: CAE5F9B8-70BD-4E4C-FB98-2D3F60718293: Prepare slides (priority: medium)
 Eventually: F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book (priority: low)
 Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
 $ reminders show-all --sort priority --sort-order descending
 Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 Eventually: F7B2C6E5-4D8A-4B1F-CE65-9A0C3D4E5F60: Read a book (priority: low)
@@ -269,8 +298,9 @@ Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (priority: high)
 
 ### See help for more examples
 
-```
+```console
 $ reminders --help
+
 $ reminders show -h
 ```
 
@@ -278,7 +308,7 @@ $ reminders show -h
 
 ### With [Homebrew](http://brew.sh/)
 
-```
+```console
 $ brew install keith/formulae/reminders-cli
 ```
 
@@ -287,7 +317,7 @@ $ brew install keith/formulae/reminders-cli
 Download the latest release from
 [here](https://github.com/keith/reminders-cli/releases)
 
-```
+```console
 $ tar -zxvf reminders.tar.gz
 $ mv reminders /usr/local/bin
 $ rm reminders.tar.gz
@@ -297,7 +327,7 @@ $ rm reminders.tar.gz
 
 This requires a recent Xcode installation.
 
-```
+```console
 $ cd reminders-cli
 $ make build-release
 $ cp .build/apple/Products/Release/reminders /usr/local/bin/reminders
