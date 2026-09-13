@@ -1,4 +1,4 @@
-name: Swift
+name: MR Test
 
 on:
   push:
