@@ -555,6 +555,7 @@ public final class Reminders {
         clearDueDate: Bool = false,
         priority: Priority? = nil,
         clearPriority: Bool = false,
+        newListName: String? = nil,
         newRecurrence: Recurrence?, newRecurrenceInterval: Int?,
         newRecurrenceEndDate: DateComponents?,
         clearRecurrenceEnd: Bool,
@@ -580,6 +581,10 @@ public final class Reminders {
                     reminder.priority = Int(EKReminderPriority.none.rawValue)
                 } else if let priority {
                     reminder.priority = Int(priority.value.rawValue)
+                }
+
+                if let newListName {
+                    reminder.calendar = self.calendar(withName: newListName)
                 }
 
                 if clearDueDate {
