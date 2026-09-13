@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.1](https://github.com/udondan/reminders-cli/compare/v3.1.0...v3.1.1) (2026-09-13)
+
+
+### Miscellaneous Chores
+
+* publish releases as drafts so the tarball can be attached before publishing ([#40](https://github.com/udondan/reminders-cli/issues/40)) ([740fcfe](https://github.com/udondan/reminders-cli/commit/740fcfe2c65c18dedd95e75e4fce94bfeb476809))
+
 ## [3.1.0](https://github.com/udondan/reminders-cli/compare/v3.0.1...v3.1.0) (2026-09-13)
 
 
