@@ -74,6 +74,20 @@ $ reminders show Soon
 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C: Some edited text
 ```
 
+Set or clear a reminder's notes:
+
+```console
+$ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --notes "Bring the charger"
+Updated reminder 'Some edited text'
+
+$ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --clear-notes
+Updated reminder 'Some edited text'
+```
+
+`--notes ""` (with the empty string as a separate argument) also clears the notes, but the
+`--notes=""` spelling is rejected by the argument parser as a missing value, so prefer
+`--clear-notes` in scripts.
+
 Set or clear a reminder's priority:
 
 ```console
