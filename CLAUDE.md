@@ -37,4 +37,6 @@ Reminder items are looked up only by their stable `calendarItemExternalIdentifie
 
 ## Release process
 
-Releases are packaged manually, not via CI (the GitHub Actions workflow only builds and tests on push/PR to `main`). `make package` builds a universal release binary, generates a zsh completion script, and produces `reminders.tar.gz` plus SHA-256 checksums for both the tarball and the raw binary — these are what get attached to a GitHub release.
+Releases are automated via [release-please](https://github.com/googleapis/release-please): merges to `main` accumulate into a release PR (version bump driven by Conventional Commits, tracked in `version.txt`/`.release-please-manifest.json`/`release-please-config.json`), and merging that PR tags and publishes a GitHub Release. That in turn triggers `.github/workflows/publish.yml`, which runs `make package` to build the universal release binary/tarball, attaches `reminders.tar.gz` to the release, and pushes an updated formula to the `udondan/homebrew-software` tap (`brew install udondan/software/reminders-cli`).
+
+The CLI's `--version` output is backed by `Sources/RemindersLibrary/Version.swift`, which release-please keeps in sync with `version.txt` via an `extra-files` generic updater — don't hand-edit the version in either file outside of a release-please PR.
