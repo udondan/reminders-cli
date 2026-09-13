@@ -34,6 +34,27 @@ private struct ShowAll: ParsableCommand {
         help: "Show only reminders due on this date")
     var dueDate: DateComponents?
 
+    @Flag(help: "Only show reminders with a due date in the past")
+    var overdue = false
+
+    @Option(help: "Only show reminders due on or before this date")
+    var dueBefore: DateComponents?
+
+    @Option(help: "Only show reminders due on or after this date")
+    var dueAfter: DateComponents?
+
+    @Flag(help: "Only show reminders with no due date")
+    var noDueDate = false
+
+    @Option(help: "Only show reminders with this priority; repeat to specify multiple")
+    var priority: [Priority] = []
+
+    @Option(help: "Only show reminders whose title or notes contain this text (case-insensitive)")
+    var search: String?
+
+    @Option(help: "Only show reminders from this list; repeat to specify multiple")
+    var list: [String] = []
+
     @Option(
         name: .shortAndLong,
         help: "format, either of 'plain' or 'json'")
@@ -43,6 +64,13 @@ private struct ShowAll: ParsableCommand {
         if self.onlyCompleted && self.includeCompleted {
             throw ValidationError(
                 "Cannot specify both --show-completed and --only-completed")
+        }
+        if self.noDueDate
+            && (self.dueDate != nil || self.dueBefore != nil || self.dueAfter != nil
+                || self.overdue || self.includeOverdue)
+        {
+            throw ValidationError(
+                "Cannot combine --no-due-date with --due-date, --due-before, --due-after, --overdue, or --include-overdue")
         }
     }
 
@@ -56,6 +84,9 @@ private struct ShowAll: ParsableCommand {
 
         reminders.showAllReminders(
             dueOn: self.dueDate, includeOverdue: self.includeOverdue,
+            overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
+            noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
+            lists: self.list,
             displayOptions: displayOptions, outputFormat: format)
     }
 }
@@ -93,6 +124,24 @@ private struct Show: ParsableCommand {
         help: "Show only reminders due on this date")
     var dueDate: DateComponents?
 
+    @Flag(help: "Only show reminders with a due date in the past")
+    var overdue = false
+
+    @Option(help: "Only show reminders due on or before this date")
+    var dueBefore: DateComponents?
+
+    @Option(help: "Only show reminders due on or after this date")
+    var dueAfter: DateComponents?
+
+    @Flag(help: "Only show reminders with no due date")
+    var noDueDate = false
+
+    @Option(help: "Only show reminders with this priority; repeat to specify multiple")
+    var priority: [Priority] = []
+
+    @Option(help: "Only show reminders whose title or notes contain this text (case-insensitive)")
+    var search: String?
+
     @Option(
         name: .shortAndLong,
         help: "format, either of 'plain' or 'json'")
@@ -102,6 +151,13 @@ private struct Show: ParsableCommand {
         if self.onlyCompleted && self.includeCompleted {
             throw ValidationError(
                 "Cannot specify both --show-completed and --only-completed")
+        }
+        if self.noDueDate
+            && (self.dueDate != nil || self.dueBefore != nil || self.dueAfter != nil
+                || self.overdue || self.includeOverdue)
+        {
+            throw ValidationError(
+                "Cannot combine --no-due-date with --due-date, --due-before, --due-after, --overdue, or --include-overdue")
         }
     }
 
@@ -115,6 +171,8 @@ private struct Show: ParsableCommand {
 
         reminders.showListItems(
             withName: self.listName, dueOn: self.dueDate, includeOverdue: self.includeOverdue,
+            overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
+            noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
             displayOptions: displayOptions, outputFormat: format, sort: sort, sortOrder: sortOrder)
     }
 }
