@@ -12,6 +12,13 @@ Soon (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)
 Eventually (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)
 ```
 
+Show only the default list (the one Reminders.app adds new reminders to):
+
+```console
+$ reminders show-lists --default-only
+Soon (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)
+```
+
 Every list also has a stable identifier, shown above in parentheses (and available as
 `calendarIdentifier` with `--format json`). Anywhere a list name is accepted — `show`, `show-all`,
 `add`, `complete`, `uncomplete`, `edit`, `postpone`, `delete` — a list ID works too, which is useful

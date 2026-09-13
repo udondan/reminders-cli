@@ -15,8 +15,25 @@ private let recurrenceDateFormatter: DateFormatter = {
 
 private func formattedDueDate(from reminder: EKReminder) -> String? {
     return reminder.dueDateComponents?.date.map {
-        dateFormatter.localizedString(for: $0, relativeTo: Date())
+        relativeDueDate(for: $0, relativeTo: Date())
     }
+}
+
+/// Describes `date` relative to `now`, counting whole calendar days rather than
+/// elapsed 24-hour periods. Thursday 09:00 -> Saturday 08:00 is "in 2 days", not
+/// "in 1 day". Same-day dates keep the hour granularity ("in 3 hours").
+func relativeDueDate(
+    for date: Date,
+    relativeTo now: Date,
+    calendar: Calendar = .current,
+    formatter: RelativeDateTimeFormatter = dateFormatter
+) -> String {
+    if calendar.isDate(date, inSameDayAs: now) {
+        return formatter.localizedString(for: date, relativeTo: now)
+    }
+    return formatter.localizedString(
+        for: calendar.startOfDay(for: date),
+        relativeTo: calendar.startOfDay(for: now))
 }
 
 private func formattedRecurrence(from reminder: EKReminder) -> String? {
@@ -503,8 +520,21 @@ public final class Reminders {
         return self.getCalendars().map { $0.title }
     }
 
-    func showLists(outputFormat: OutputFormat) {
-        let calendars = self.getCalendars()
+    func getDefaultList() -> EKCalendar? {
+        return Store.defaultCalendarForNewReminders()
+    }
+
+    func showLists(outputFormat: OutputFormat, defaultOnly: Bool = false) {
+        let calendars: [EKCalendar]
+        if defaultOnly {
+            guard let defaultCalendar = self.getDefaultList() else {
+                print("No default reminders list is configured")
+                exit(1)
+            }
+            calendars = [defaultCalendar]
+        } else {
+            calendars = self.getCalendars()
+        }
         switch (outputFormat) {
         case .json:
             print(encodeToJson(data: calendars))
