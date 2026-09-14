@@ -795,6 +795,52 @@ public final class Reminders {
         }
     }
 
+    /// Prints the `doctor` report and returns whether it found no failures. Only reads the
+    /// authorization status and never requests access; lists and reminders are read only with
+    /// full access, since without it EventKit returns nothing useful.
+    func runDoctor(outputFormat: OutputFormat) -> Bool {
+        let authorization = ReminderAuthorization(
+            rawStatus: EKEventStore.authorizationStatus(for: .reminder).rawValue)
+
+        var data: DoctorData?
+        if authorization == .fullAccess {
+            let calendars = self.getCalendars()
+            let openReminders = calendars.isEmpty
+                ? []
+                : self.fetchReminders(
+                    matching: Store.predicateForIncompleteReminders(
+                        withDueDateStarting: nil, ending: nil, calendars: calendars),
+                    displayOptions: .incomplete)
+            data = DoctorData(
+                sources: summarizeSources(calendars.map { $0.source?.title ?? "Unknown" }),
+                defaultList: self.getDefaultList().map {
+                    DoctorDefaultList(title: $0.title, sourceTitle: $0.source?.title)
+                },
+                openReminderCount: openReminders.count)
+        }
+
+        let report = DoctorReport(
+            version: version,
+            macOS: formatOSVersion(ProcessInfo.processInfo.operatingSystemVersion),
+            macOSBuild: macOSBuildNumber(),
+            binary: currentExecutablePath(),
+            architecture: currentArchitecture,
+            authorization: authorization,
+            accessRequestAPI: .current,
+            parentProcess: detectParentProcess(),
+            data: data)
+
+        switch outputFormat {
+        case .json:
+            print(encodeToJson(data: report))
+        case .plain:
+            for line in formatDoctorReport(report) {
+                print(line)
+            }
+        }
+        return report.isHealthy
+    }
+
     func showAllReminders(
         dueOn dueDate: DateComponents?, includeOverdue: Bool,
         overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,

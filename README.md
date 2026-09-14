@@ -461,6 +461,61 @@ reminders --help
 reminders show -h
 ```
 
+## Troubleshooting
+
+Most problems come down to Reminders access: it was denied, it was never requested because the
+command ran from somewhere that can't show the permission prompt, or it was granted to a different
+terminal app than the one you're using. `reminders doctor` reports the authorization state and the
+environment, and prints a fix for anything that's wrong. It never asks for access itself.
+
+```console
+$ reminders doctor
+OK    Version: reminders-cli 3.3.0
+OK    macOS: 15.4 (24E248)
+OK    Binary: /opt/homebrew/bin/reminders (arm64)
+OK    Parent process: Terminal.app
+FAIL  Reminders access: Denied
+      Open System Settings > Privacy & Security > Reminders and enable access for Terminal.app (the app that launched this command). Then re-run.
+OK    Access request API: requestFullAccessToReminders (macOS 14+)
+$ echo $?
+1
+```
+
+Access is granted per app, so the parent process line names the app that has to be allowed (for
+example Terminal, iTerm or Visual Studio Code). With full access, `doctor` also lists the accounts
+holding reminder lists, the default list, and the number of lists and open reminders. Checks marked
+`WARN` (no lists, no default list) don't affect the exit status.
+
+`reminders doctor` exits `0` when no check failed and `1` otherwise, so it can serve as a health
+check in scripts. With `--format json` it prints one object with the same information and a
+`problems` array of `{code, severity, message, suggestion}` objects, which is empty when everything
+is fine:
+
+```console
+$ reminders doctor --format json
+{
+  "accessRequestAPI" : "requestFullAccessToReminders",
+  "architecture" : "arm64",
+  "authorization" : "denied",
+  "binary" : "\/opt\/homebrew\/bin\/reminders",
+  "macOS" : "15.4",
+  "parentProcess" : "Terminal",
+  "problems" : [
+    {
+      "code" : "access_denied",
+      "message" : "Reminders access was denied",
+      "severity" : "fail",
+      "suggestion" : "Open System Settings > Privacy & Security > Reminders and enable access for Terminal.app (the app that launched this command). Then re-run."
+    }
+  ],
+  "version" : "3.3.0"
+}
+```
+
+`authorization` is one of `fullAccess`, `writeOnly`, `denied`, `restricted`, `notDetermined` or
+`unknown`. `sources`, `defaultList`, `listCount` and `openReminderCount` are only present with full
+access.
+
 ## Errors
 
 Errors are always written to **stderr**, never to stdout, so `reminders ... --format json | jq`

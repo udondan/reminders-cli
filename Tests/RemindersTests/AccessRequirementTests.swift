@@ -22,6 +22,19 @@ final class AccessRequirementTests: XCTestCase {
         XCTAssertFalse(AccessRequirement.requiresReminderAccess(arguments: ["show", "--help"]))
     }
 
+    /// `doctor` reports the authorization state, so it must never trigger the access prompt.
+    func testDoctorDoesNotRequireAccess() {
+        XCTAssertFalse(AccessRequirement.requiresReminderAccess(arguments: ["doctor"]))
+        XCTAssertFalse(
+            AccessRequirement.requiresReminderAccess(arguments: ["doctor", "--format", "json"]))
+    }
+
+    func testDoctorAsAnArgumentStillRequiresAccess() {
+        XCTAssertTrue(AccessRequirement.requiresReminderAccess(arguments: ["show", "doctor"]))
+        XCTAssertTrue(
+            AccessRequirement.requiresReminderAccess(arguments: ["add", "List", "doctor"]))
+    }
+
     func testActualSubcommandsRequireAccess() {
         XCTAssertTrue(AccessRequirement.requiresReminderAccess(arguments: ["show-lists"]))
         XCTAssertTrue(

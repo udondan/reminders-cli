@@ -11,7 +11,7 @@ allowed-tools: Bash(reminders:*)
 ## Invocation
 
 - The binary is `reminders` and must be on `PATH`. Install with `brew install udondan/software/reminders-cli`.
-- The terminal application running the command needs Reminders access (System Settings > Privacy & Security > Reminders). Without it every command fails with exit status 11.
+- The terminal application running the command needs Reminders access (System Settings > Privacy & Security > Reminders). Without it every command fails with exit status 11. When that happens, or a command unexpectedly returns nothing, run `reminders doctor --format json` and relay the `suggestion` of each entry in `problems` to the user.
 - Output goes to stdout. Errors go to stderr only, with a stable code and exit status (see Errors).
 
 ## Rules for agents
@@ -19,7 +19,7 @@ allowed-tools: Bash(reminders:*)
 1. **Always pass `--format json`.** Every subcommand supports it. Parse the output instead of the plain-text format.
 2. **Always act on reminders by ID.** Every reminder has a stable `externalId`. Look it up with `show` or `show-all`, then pass it to `edit`, `complete`, `uncomplete`, `postpone` and `delete`. Never match reminders by title.
 3. Wherever a `<list>` argument is accepted, either the list name or its `calendarIdentifier` (from `show-lists --format json`) works. Prefer the ID when the name is ambiguous or contains shell-unfriendly characters.
-4. `show`, `show-all`, `today`, `overdue`, `upcoming` and `show-lists` print a JSON array. `add`, `edit`, `complete`, `uncomplete`, `postpone` and `delete` print the affected reminder as a single JSON object (for `delete`, the reminder as it was before removal). `new-list` prints the created list. Keys are sorted alphabetically.
+4. `show`, `show-all`, `today`, `overdue`, `upcoming` and `show-lists` print a JSON array. `add`, `edit`, `complete`, `uncomplete`, `postpone` and `delete` print the affected reminder as a single JSON object (for `delete`, the reminder as it was before removal). `new-list` prints the created list. `doctor` prints a single diagnostics object. Keys are sorted alphabetically.
 5. Reminder text and notes are passed as trailing positional arguments and may contain spaces; quote them.
 6. `delete` finds a reminder by ID regardless of completion state, so completed reminders need no special handling.
 
@@ -40,6 +40,7 @@ allowed-tools: Bash(reminders:*)
 | `reminders postpone <list> <id> [date]` | Move the due date without touching the repeat rule. Pass either a `date` or `--next-weekday` (next Mon-Fri, keeps the time of day, requires an existing due date) |
 | `reminders delete <list> <id>` | Delete the reminder |
 | `reminders new-list <name>` | `--source`/`-s <name>` (account to create the list in, e.g. iCloud; required only when several accounts hold lists) |
+| `reminders doctor` | Diagnose Reminders access and the environment without requesting access. Exits 0 when no check failed, 1 otherwise (the report is still on stdout, nothing on stderr) |
 
 All commands also accept `--format`/`-f <plain|json>`.
 
@@ -88,6 +89,8 @@ All dates are ISO 8601 strings in UTC (for example `2026-09-14T07:00:00Z`). Fiel
 <!-- json-fields:end -->
 
 `show-lists --format json` returns list objects with `title`, `calendarIdentifier`, `openCount` (reminders that are not completed) and `overdueCount` (of those, the ones whose due date has passed — the same definition as `show --overdue`). `completedCount` is present only with `--include-completed`. `new-list --format json` returns a list object with `title` and `calendarIdentifier` only.
+
+`doctor --format json` returns `version`, `macOS`, `binary`, `architecture`, `authorization` (`fullAccess`, `writeOnly`, `denied`, `restricted`, `notDetermined` or `unknown`), `accessRequestAPI`, `parentProcess` (the app Reminders access is granted to, `null` if unknown) and `problems`, an array of `{code, severity, message, suggestion}` that is empty when everything is fine. `severity` is `fail` (makes `doctor` exit 1) or `warn`. Codes: `access_denied`, `access_restricted`, `access_not_determined`, `access_write_only`, `access_unknown`, `no_lists`, `no_default_list`. Only with full access, `sources` (`[{title, listCount}]`), `defaultList` (`null` when none), `listCount` and `openReminderCount` are present too.
 
 ## Errors
 
