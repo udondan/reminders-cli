@@ -381,6 +381,17 @@ private struct Add: FormattedCommand {
         help: "Stop repeating after this date (default: repeats forever)")
     var repeatUntil: DateComponents?
 
+    @Option(
+        name: .long,
+        help: "Repeat weekly on these days, comma-separated: mon..sun or full names, or weekdays/weekends; implies --repeat weekly",
+        transform: RepeatDays.init(parsing:))
+    var repeatOn: RepeatDays?
+
+    /// `--repeat-on` on its own means a weekly repeat.
+    private var recurrence: Recurrence? {
+        repeat_ ?? (repeatOn != nil ? .weekly : nil)
+    }
+
     func validate() throws {
         if let repeat_ = repeat_, !repeat_.isRepresentable {
             throw ValidationError(
@@ -388,8 +399,12 @@ private struct Add: FormattedCommand {
                     + "recurrence frequency (Reminders.app itself doesn't expose this either). Use "
                     + "daily, weekly, monthly, or yearly.")
         }
-        if repeat_ != nil && dueDate == nil {
-            throw ValidationError("--repeat requires --due-date")
+        if let repeat_, repeatOn != nil, repeat_ != .weekly {
+            throw ValidationError("--repeat-on requires --repeat weekly")
+        }
+        if recurrence != nil && dueDate == nil {
+            throw ValidationError(
+                repeat_ != nil ? "--repeat requires --due-date" : "--repeat-on requires --due-date")
         }
         if let repeatUntil, let dueDate,
             let endDate = recurrenceEndDate(from: repeatUntil),
@@ -400,9 +415,9 @@ private struct Add: FormattedCommand {
         if let repeatInterval, repeatInterval < 1 {
             throw ValidationError("--repeat-interval must be at least 1")
         }
-        if repeat_ == nil && (repeatInterval != nil || repeatUntil != nil) {
+        if recurrence == nil && (repeatInterval != nil || repeatUntil != nil) {
             throw ValidationError(
-                "--repeat-interval and --repeat-until require --repeat")
+                "--repeat-interval and --repeat-until require --repeat or --repeat-on")
         }
     }
 
@@ -413,9 +428,10 @@ private struct Add: FormattedCommand {
             toListNameOrId: self.listNameOrId,
             dueDateComponents: self.dueDate,
             priority: priority,
-            recurrence: self.repeat_,
+            recurrence: self.recurrence,
             recurrenceInterval: self.repeatInterval ?? 1,
             recurrenceEndDate: self.repeatUntil,
+            recurrenceDays: self.repeatOn,
             outputFormat: format)
     }
 }
@@ -560,6 +576,17 @@ private struct Edit: FormattedCommand {
     var clearRepeatEnd = false
 
     @Option(
+        name: .long,
+        help: "Repeat on these days, comma-separated: mon..sun or full names, or weekdays/weekends; replaces only the days of a weekly repeat",
+        transform: RepeatDays.init(parsing:))
+    var repeatOn: RepeatDays?
+
+    @Flag(
+        name: .long,
+        help: "Remove the repeat days from a weekly repeat, keeping everything else")
+    var clearRepeatOn = false
+
+    @Option(
         name: .shortAndLong,
         help: "The new date the reminder is due")
     var dueDate: DateComponents?
@@ -590,6 +617,7 @@ private struct Edit: FormattedCommand {
 
         let changesRecurrence = self.repeat_ != nil || self.repeatInterval != nil
             || self.repeatUntil != nil || self.clearRepeatEnd
+            || self.repeatOn != nil || self.clearRepeatOn
 
         if self.reminder.isEmpty && self.notes == nil && !self.clearNotes && self.dueDate == nil
             && !self.clearDueDate && !changesRecurrence && !self.clearRepeat
@@ -617,6 +645,12 @@ private struct Edit: FormattedCommand {
             throw ValidationError(
                 "Specify only one of --repeat-until or --clear-repeat-end")
         }
+        if self.repeatOn != nil && self.clearRepeatOn {
+            throw ValidationError("Cannot specify both --repeat-on and --clear-repeat-on")
+        }
+        if let repeat_, repeat_ != .weekly, self.repeatOn != nil || self.clearRepeatOn {
+            throw ValidationError("--repeat-on and --clear-repeat-on require a weekly repeat")
+        }
     }
 
     func run() throws {
@@ -636,6 +670,8 @@ private struct Edit: FormattedCommand {
             newRecurrenceInterval: self.repeatInterval,
             newRecurrenceEndDate: self.repeatUntil,
             clearRecurrenceEnd: self.clearRepeatEnd,
+            newRecurrenceDays: self.repeatOn,
+            clearRecurrenceDays: self.clearRepeatOn,
             clearRecurrence: self.clearRepeat,
             outputFormat: format
         )

@@ -252,6 +252,9 @@ D5F0A4C3-2B6E-4F9D-AC43-7E8A1B2C3D4E: Something really important (priority: high
 reminders add Soon Weekly review --due-date "monday 9am" --repeat weekly
 reminders add Soon Pay rent --due-date "2026-09-01" --repeat monthly --repeat-until "2027-09-01"
 reminders add Soon Water the plants --due-date "tomorrow" --repeat daily --repeat-interval 3
+reminders add Soon Gym --due-date "monday 7am" --repeat-on mon,wed,fri
+reminders add Soon Stand-up --due-date "monday 9am" --repeat weekly --repeat-on weekdays
+reminders add Soon Swim --due-date "tuesday 6pm" --repeat-on tue,thu --repeat-interval 2
 ```
 
 - `--repeat` accepts `daily`, `weekly`, `monthly`, or `yearly`. EventKit reminders have no hourly
@@ -261,8 +264,13 @@ reminders add Soon Water the plants --due-date "tomorrow" --repeat daily --repea
 --repeat weekly` for every other week) and defaults to 1.
 - `--repeat-until` stops the recurrence after a date; omitting it repeats forever, matching the
   Reminders.app default. A date without a time includes the whole local day.
-- On `add`, recurrence options require `--repeat` to also be set, and a repeating reminder
-  requires `--due-date`.
+- `--repeat-on` picks the days a weekly repeat fires on: a comma-separated list of day names,
+  full (`monday`) or three-letter (`mon`), case-insensitive, or the aliases `weekdays` (Monday to
+  Friday) and `weekends` (Saturday and Sunday). Duplicates are ignored and unknown names are
+  rejected with the accepted spellings. It only applies to weekly repeats: on `add` it implies
+  `--repeat weekly` and is rejected together with `daily`, `monthly`, or `yearly`.
+- On `add`, `--repeat-interval` and `--repeat-until` require `--repeat` or `--repeat-on`, and a
+  repeating reminder requires `--due-date`.
 
 To change or remove a repeat rule on an existing reminder, use `edit`:
 
@@ -270,16 +278,24 @@ To change or remove a repeat rule on an existing reminder, use `edit`:
 reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat monthly
 reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat-until "2027-09-01"
 reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat-end
+reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --repeat-on weekdays
+reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat-on
 reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat
 ```
 
 - Changing only the interval or end condition preserves the existing frequency and any complex
   selectors, such as "the last Friday of every month".
+- `--repeat-on` replaces only the days of an existing weekly repeat and keeps its interval and end
+  condition; `--clear-repeat-on` removes the days and keeps everything else. Both fail on a
+  reminder whose repeat isn't weekly, unless combined with `--repeat weekly`.
 - Changing the frequency preserves the existing end condition but resets its interval to 1 unless
   `--repeat-interval` is supplied.
 - An end-only edit copies the complete EventKit rule so provider-specific calendar metadata is
   preserved as well.
-- JSON output includes `recurrence`, `recurrenceInterval`, and either `recurrenceEnd` or
+- Plain output shows the days as `(repeats: weekly on Mon, Wed, Fri)`.
+- JSON output includes `recurrence`, `recurrenceInterval`, `recurrenceDays` (lowercase
+  three-letter names in Sunday-first order, e.g. `["mon","wed","fri"]`, omitted when the rule has
+  no days), and either `recurrenceEnd` or
   `recurrenceCount` (when an existing rule is count-based) for repeating reminders, plus a
   `hasRecurrence` boolean on every reminder (so scripts can check it without testing for a
   missing or `null` field) and, where computable, a `nextDueDate`.
@@ -295,10 +311,11 @@ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat
 - Completing a repeating reminder moves it to its next occurrence and leaves a completed copy
   without a repeat rule. A completed reminder that still has a rule has run out of occurrences,
   so it has no `nextDueDate`.
-- It's only populated for the plain daily/weekly/monthly/yearly (+ interval) rules this CLI
-  itself creates and edits; a rule with EventKit-native selectors such as "the last Friday of
-  every month" (only reachable by editing a rule this CLI didn't create) omits the field rather
-  than guess.
+- It's only populated for the rules this CLI itself creates and edits: plain
+  daily/weekly/monthly/yearly (+ interval) rules and weekly rules on days (`--repeat-on`), where
+  the interval counts weeks from the due date's week. A rule with other EventKit-native selectors
+  such as "the last Friday of every month" (only reachable by editing a rule this CLI didn't
+  create) omits the field rather than guess.
 
 ### Show reminders due on or by a date
 

@@ -33,8 +33,8 @@ allowed-tools: Bash(reminders:*)
 | `reminders today` | Incomplete reminders due today plus overdue ones, across all lists. `--no-overdue` (only due today), `--list <list>` (repeatable), `--sort`/`--sort-order` (default due date ascending) |
 | `reminders overdue` | Incomplete reminders whose due date has passed. `--list <list>` (repeatable), `--sort`/`--sort-order` (default due date ascending) |
 | `reminders upcoming` | Incomplete reminders due from now through the end of the day N days ahead. `--days <n>` (default 7), `--include-overdue` (also past-due ones), `--list <list>` (repeatable), `--sort`/`--sort-order` (default due date ascending) |
-| `reminders add <list> <text...>` | `--due-date`/`-d <date>`, `--priority`/`-p <none\|low\|medium\|high>`, `--notes`/`-n <text>`, `--repeat <daily\|weekly\|monthly\|yearly>`, `--repeat-interval <n>`, `--repeat-until <date>` |
-| `reminders edit <list> <id> [new text...]` | `--due-date`/`-d <date>`, `--clear-due-date`, `--priority`/`-p <value>`, `--clear-priority`, `--notes`/`-n <text>` (overwrites), `--clear-notes`, `--list <list>` (move to another list), `--repeat <frequency>`, `--repeat-interval <n>`, `--repeat-until <date>`, `--clear-repeat-end` (repeat forever), `--clear-repeat` |
+| `reminders add <list> <text...>` | `--due-date`/`-d <date>`, `--priority`/`-p <none\|low\|medium\|high>`, `--notes`/`-n <text>`, `--repeat <daily\|weekly\|monthly\|yearly>`, `--repeat-interval <n>`, `--repeat-until <date>`, `--repeat-on <days>` (weekly on these days, e.g. `mon,wed,fri`, `weekdays`, `weekends`; implies `--repeat weekly`) |
+| `reminders edit <list> <id> [new text...]` | `--due-date`/`-d <date>`, `--clear-due-date`, `--priority`/`-p <value>`, `--clear-priority`, `--notes`/`-n <text>` (overwrites), `--clear-notes`, `--list <list>` (move to another list), `--repeat <frequency>`, `--repeat-interval <n>`, `--repeat-until <date>`, `--clear-repeat-end` (repeat forever), `--repeat-on <days>` (replace the days of a weekly repeat), `--clear-repeat-on` (remove the days), `--clear-repeat` |
 | `reminders complete <list> <id>` | Mark done |
 | `reminders uncomplete <list> <id>` | Mark not done |
 | `reminders postpone <list> <id> [date]` | Move the due date without touching the repeat rule. Pass either a `date` or `--next-weekday` (next Mon-Fri, keeps the time of day, requires an existing due date) |
@@ -47,8 +47,9 @@ Constraints enforced by the CLI (violations are usage errors, exit status 64):
 
 - `show`/`show-all`: `--only-completed` and `--include-completed` are exclusive. `--no-due-date` cannot be combined with `--due-date`, `--due-before`, `--due-after`, `--overdue` or `--include-overdue`. `--completed-since` requires `--only-completed` or `--include-completed`. `--list` exists only on `show-all`. `--flagged` combines with every other filter.
 - Flagged state is read-only. `add` and `edit` have no flag options, so tell the user to flag or unflag in Reminders.app.
-- `add`: `--repeat` requires `--due-date`. `--repeat-interval` and `--repeat-until` require `--repeat`. `--repeat-interval` must be at least 1. `--repeat-until` must not be earlier than `--due-date`. `hourly` is rejected because EventKit reminders have no hourly frequency.
-- `edit`: at least one change is required. `--due-date`/`--clear-due-date`, `--priority`/`--clear-priority` and `--notes`/`--clear-notes` are pairwise exclusive. `--clear-repeat` cannot be combined with other repeat options. Changing only the interval or end keeps the existing frequency. Changing the frequency resets the interval to 1 unless `--repeat-interval` is given.
+- `add`: `--repeat` and `--repeat-on` require `--due-date`. `--repeat-interval` and `--repeat-until` require `--repeat` or `--repeat-on`. `--repeat-interval` must be at least 1. `--repeat-until` must not be earlier than `--due-date`. `hourly` is rejected because EventKit reminders have no hourly frequency.
+- `--repeat-on` takes a comma-separated list of `sun`..`sat` or full day names (case-insensitive), or the aliases `weekdays` (Mon-Fri) and `weekends` (Sat, Sun). Duplicates are ignored, unknown names are a usage error. It only works with a weekly repeat: combining it with `--repeat daily|monthly|yearly` is a usage error.
+- `edit`: at least one change is required. `--due-date`/`--clear-due-date`, `--priority`/`--clear-priority`, `--notes`/`--clear-notes` and `--repeat-on`/`--clear-repeat-on` are pairwise exclusive. `--clear-repeat` cannot be combined with other repeat options. Changing only the interval, end or days keeps the existing frequency. `--repeat-on`/`--clear-repeat-on` on a reminder whose repeat is not weekly fails with `invalid_argument`. Changing the frequency resets the interval to 1 unless `--repeat-interval` is given.
 - `postpone`: exactly one of `date` or `--next-weekday`.
 - `upcoming`: `--days` must be at least 1.
 - `--sort priority` orders high, medium, low, then none, with due date ascending as the tiebreaker. `--sort due-date` always puts reminders without a due date last.
@@ -78,11 +79,12 @@ All dates are ISO 8601 strings in UTC (for example `2026-09-14T07:00:00Z`). Fiel
 | `listId` | string | always | `calendarIdentifier` of that list. |
 | `recurrence` | string | optional | `daily`, `weekly`, `monthly` or `yearly`. Only present when `hasRecurrence` is true. |
 | `recurrenceInterval` | integer | optional | Repeat every N units of `recurrence`. Only present when `hasRecurrence` is true. |
+| `recurrenceDays` | array of strings | optional | Days a weekly repeat fires on, lowercase three-letter names in Sunday-first order, e.g. `["mon","wed","fri"]`. Only present when the rule has plain weekday selectors. |
 | `recurrenceEnd` | string | optional | Date the repeat rule ends. Only for date-ended rules. |
 | `recurrenceCount` | integer | optional | Number of occurrences. Only for count-ended rules (created by Reminders.app, not by this CLI). |
 | `hasRecurrence` | boolean | always | Whether a repeat rule is set. |
 | `isFlagged` | boolean | always | Whether the reminder is flagged. Read-only: no command can set or clear it. Reads `false` on macOS versions that don't expose the flag. |
-| `nextDueDate` | string | optional | Next actionable occurrence of a repeating reminder, computed by the CLI. Only present when `hasRecurrence` is true, `isCompleted` is false and the rule is a plain daily/weekly/monthly/yearly (+ interval) rule. |
+| `nextDueDate` | string | optional | Next actionable occurrence of a repeating reminder, computed by the CLI. Only present when `hasRecurrence` is true, `isCompleted` is false and the rule is a plain daily/weekly/monthly/yearly (+ interval) rule or a weekly rule on `recurrenceDays`. |
 <!-- json-fields:end -->
 
 `show-lists --format json` returns list objects with `title`, `calendarIdentifier`, `openCount` (reminders that are not completed) and `overdueCount` (of those, the ones whose due date has passed — the same definition as `show --overdue`). `completedCount` is present only with `--include-completed`. `new-list --format json` returns a list object with `title` and `calendarIdentifier` only.
@@ -109,7 +111,7 @@ Exit statuses 3 (`list_ambiguous`) and 5 (`reminder_ambiguous`) are reserved and
 
 ## Repeating reminders
 
-EventKit does not advance a repeating reminder's due date as occurrences pass. `dueDate` stays at whatever it was last set to and can be arbitrarily far in the past. When you need the next occurrence, read `nextDueDate`. It is absent for rules with EventKit-native selectors such as "the last Friday of every month", which this CLI cannot create; in that case fall back to `dueDate` and say so.
+EventKit does not advance a repeating reminder's due date as occurrences pass. `dueDate` stays at whatever it was last set to and can be arbitrarily far in the past. When you need the next occurrence, read `nextDueDate`. It is computed for weekly rules on days (`--repeat-on`) too, but absent for other EventKit-native selectors such as "the last Friday of every month", which this CLI cannot create; in that case fall back to `dueDate` and say so.
 
 To move a repeating reminder forward without changing its rule, use `postpone`.
 
