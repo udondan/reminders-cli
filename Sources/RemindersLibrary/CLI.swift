@@ -132,6 +132,109 @@ private struct ShowAll: FormattedCommand {
     }
 }
 
+private struct Today: FormattedCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Show reminders due today or overdue (same as 'show-all --due-date today --include-overdue --sort due-date')")
+
+    @Flag(help: "Only show reminders due today, without overdue ones")
+    var noOverdue = false
+
+    @Option(help: "Only show reminders from this list (name, unique part of a name, or ID); repeat to specify multiple")
+    var list: [String] = []
+
+    @Option(
+        name: .shortAndLong,
+        help: "Show the reminders in a specific order, one of: \(Sort.commaSeparatedCases)")
+    var sort: Sort = .dueDate
+
+    @Option(
+        name: [.customShort("o"), .long],
+        help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
+    var sortOrder: CustomSortOrder = .ascending
+
+    @Option(
+        name: .shortAndLong,
+        help: "format, either of 'plain' or 'json'")
+    var format: OutputFormat = .plain
+
+    func run() throws {
+        try reminders.showAllReminders(
+            .today(includeOverdue: !self.noOverdue, lists: self.list, sort: sort, sortOrder: sortOrder),
+            outputFormat: format)
+    }
+}
+
+private struct Overdue: FormattedCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Show reminders whose due date has passed (same as 'show-all --overdue --sort due-date')")
+
+    @Option(help: "Only show reminders from this list (name, unique part of a name, or ID); repeat to specify multiple")
+    var list: [String] = []
+
+    @Option(
+        name: .shortAndLong,
+        help: "Show the reminders in a specific order, one of: \(Sort.commaSeparatedCases)")
+    var sort: Sort = .dueDate
+
+    @Option(
+        name: [.customShort("o"), .long],
+        help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
+    var sortOrder: CustomSortOrder = .ascending
+
+    @Option(
+        name: .shortAndLong,
+        help: "format, either of 'plain' or 'json'")
+    var format: OutputFormat = .plain
+
+    func run() throws {
+        try reminders.showAllReminders(
+            .overdue(lists: self.list, sort: sort, sortOrder: sortOrder), outputFormat: format)
+    }
+}
+
+private struct Upcoming: FormattedCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Show reminders due from now through the next 7 days (same as 'show-all --due-after <current time> --due-before \"in 7 days\" --sort due-date')")
+
+    @Option(help: "How many days ahead to look, including the whole last day")
+    var days: Int = 7
+
+    @Flag(help: "Also include reminders whose due date has passed")
+    var includeOverdue = false
+
+    @Option(help: "Only show reminders from this list (name, unique part of a name, or ID); repeat to specify multiple")
+    var list: [String] = []
+
+    @Option(
+        name: .shortAndLong,
+        help: "Show the reminders in a specific order, one of: \(Sort.commaSeparatedCases)")
+    var sort: Sort = .dueDate
+
+    @Option(
+        name: [.customShort("o"), .long],
+        help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
+    var sortOrder: CustomSortOrder = .ascending
+
+    @Option(
+        name: .shortAndLong,
+        help: "format, either of 'plain' or 'json'")
+    var format: OutputFormat = .plain
+
+    func validate() throws {
+        if self.days < 1 {
+            throw ValidationError("--days must be at least 1")
+        }
+    }
+
+    func run() throws {
+        try reminders.showAllReminders(
+            .upcoming(
+                days: self.days, includeOverdue: self.includeOverdue, lists: self.list, sort: sort,
+                sortOrder: sortOrder),
+            outputFormat: format)
+    }
+}
+
 private struct Show: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Print the items on the given list")
@@ -665,6 +768,9 @@ public struct CLI: ParsableCommand {
             ShowLists.self,
             NewList.self,
             ShowAll.self,
+            Today.self,
+            Overdue.self,
+            Upcoming.self,
         ]
     )
 

@@ -62,4 +62,20 @@ final class CLIRunTests: XCTestCase {
             XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
         }
     }
+
+    /// The convenience commands run `show-all`'s query, so an unknown `--list` fails the same way
+    /// and in the requested format.
+    func testConvenienceCommandsReportUnknownList() throws {
+        for command in ["today", "overdue", "upcoming"] {
+            let list = UUID().uuidString
+            let outcome = try CLI.runCommand([command, "--list", list, "--format", "json"])
+            assertListNotFound(outcome, list: list, format: .json)
+        }
+    }
+
+    func testUpcomingRejectsDaysBelowOne() {
+        XCTAssertThrowsError(try CLI.runCommand(["upcoming", "--days", "0"])) { error in
+            XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
+        }
+    }
 }

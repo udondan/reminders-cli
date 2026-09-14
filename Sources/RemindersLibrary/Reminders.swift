@@ -738,6 +738,16 @@ public final class Reminders {
         }
     }
 
+    /// Entry point of the `today`, `overdue` and `upcoming` commands: the same incomplete-reminder
+    /// query `show-all` runs, with the parameters `ShowAllQuery` built.
+    func showAllReminders(_ query: ShowAllQuery, outputFormat: OutputFormat) throws {
+        try self.showAllReminders(
+            dueOn: query.dueOn, includeOverdue: query.includeOverdue, overdue: query.overdue,
+            dueBefore: query.dueBefore, dueAfter: query.dueAfter, lists: query.lists,
+            displayOptions: .incomplete, outputFormat: outputFormat, sort: query.sort,
+            sortOrder: query.sortOrder)
+    }
+
     func showListItems(
         withNameOrId nameOrId: String, dueOn dueDate: DateComponents?, includeOverdue: Bool,
         overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
