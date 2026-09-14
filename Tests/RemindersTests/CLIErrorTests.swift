@@ -100,6 +100,8 @@ final class CLIErrorTests: XCTestCase {
         XCTAssertEqual(CLIError.saveFailed(action: "x", underlying: UnderlyingError()).exitCode.rawValue, 10)
         XCTAssertEqual(CLIError.accessDenied(underlying: nil).exitCode.rawValue, 11)
         XCTAssertEqual(CLIError.invalidArgument("x").exitCode.rawValue, 12)
+        XCTAssertEqual(
+            CLIError.confirmationRequired(title: "x", reminderCount: 1, completedCount: 0).exitCode.rawValue, 13)
     }
 
     // MARK: - Specific renderings
@@ -145,16 +147,27 @@ final class CLIErrorTests: XCTestCase {
             error.suggestion, "Available lists: Groceries, Work (run 'reminders show-lists' for IDs)")
     }
 
-    func testAmbiguousErrorsAreASingleLine() {
-        for error in [
-            CLIError.listAmbiguous("wor", matches: ["Work", "Work – Side projects"]),
-            CLIError.reminderAmbiguous(id: "44C1", matches: ["44C1-1 (Buy milk)", "44C1-2 (Buy eggs)"]),
-        ] {
-            XCTAssertEqual(error.rendered(format: .plain).components(separatedBy: "\n").count, 2)
+    /// The matches are listed on the `Error:` line, not one per line, so the plain error stays
+    /// exactly two lines (message and suggestion).
+    func testAmbiguousErrorsListTheMatchesOnTheMessageLine() {
+        let cases: [(CLIError, String)] = [
+            (
+                CLIError.listAmbiguous("wor", matches: ["Work", "Work – Side projects"]),
+                "Error: Multiple reminders lists match 'wor': Work, Work – Side projects"
+            ),
+            (
+                CLIError.reminderAmbiguous(id: "44C1", matches: ["44C1-1 (Buy milk)", "44C1-2 (Buy eggs)"]),
+                "Error: Multiple reminders match ID '44C1': 44C1-1 (Buy milk), 44C1-2 (Buy eggs)"
+            ),
+        ]
+        for (error, messageLine) in cases {
+            let lines = error.rendered(format: .plain).components(separatedBy: "\n")
+            XCTAssertEqual(lines.count, 2)
+            XCTAssertEqual(lines.first, messageLine)
         }
     }
 
-    func testSourceAmbiguousIsASingleLine() {
+    func testSourceAmbiguousListsTheSourcesOnTheMessageLine() {
         let error = CLIError.sourceAmbiguous(["iCloud", "Exchange"])
         XCTAssertEqual(error.message, "Multiple sources hold reminder lists: iCloud, Exchange")
         XCTAssertEqual(error.rendered(format: .plain).components(separatedBy: "\n").count, 2)

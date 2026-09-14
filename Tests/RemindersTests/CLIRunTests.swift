@@ -25,6 +25,20 @@ final class CLIRunTests: XCTestCase {
         XCTAssertEqual(actualFormat, format, file: file, line: line)
     }
 
+    /// Usage errors stay with ArgumentParser (help text, exit status 64) instead of becoming a
+    /// `CLIError`; the message makes sure the arguments fail for the reason the test is named after.
+    private func assertUsageError(
+        _ arguments: [String], contains message: String,
+        file: StaticString = #filePath, line: UInt = #line
+    ) {
+        XCTAssertThrowsError(try CLI.runCommand(arguments), file: file, line: line) { error in
+            XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)", file: file, line: line)
+            let rendered = CLI.message(for: error)
+            XCTAssertTrue(
+                rendered.contains(message), "expected '\(message)' in '\(rendered)'", file: file, line: line)
+        }
+    }
+
     func testUnknownListIsReportedAsListNotFoundInPlainFormat() throws {
         let list = UUID().uuidString
         let outcome = try CLI.runCommand(["show", list])
@@ -66,9 +80,7 @@ final class CLIRunTests: XCTestCase {
     }
 
     func testCompleteRequiresAnId() {
-        XCTAssertThrowsError(try CLI.runCommand(["complete", UUID().uuidString])) { error in
-            XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
-        }
+        assertUsageError(["complete", UUID().uuidString], contains: "Missing expected argument '<ids> ...'")
     }
 
     /// `delete-list` resolves the list before anything else, so an unknown list fails even with
@@ -84,23 +96,17 @@ final class CLIRunTests: XCTestCase {
     }
 
     func testDeleteListRequiresListArgument() {
-        XCTAssertThrowsError(try CLI.runCommand(["delete-list", "--confirm"])) { error in
-            XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
-        }
+        assertUsageError(["delete-list", "--confirm"], contains: "Missing expected argument '<list-name-or-id>'")
     }
 
     func testValidationErrorsAreRethrownUnchanged() {
-        XCTAssertThrowsError(try CLI.runCommand(["show"])) { error in
-            XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
-        }
+        assertUsageError(["show"], contains: "Missing expected argument '<list-name-or-id>'")
     }
 
     /// Only the parse failure is exercised: a valid `show-lists` would print the machine's real
     /// lists on a developer machine that has granted the test runner access.
     func testShowListsRejectsUnknownSort() {
-        XCTAssertThrowsError(try CLI.runCommand(["show-lists", "--sort", "bogus"])) { error in
-            XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
-        }
+        assertUsageError(["show-lists", "--sort", "bogus"], contains: "The value 'bogus' is invalid for '--sort <sort>'")
     }
 
     /// The convenience commands run `show-all`'s query, so an unknown `--list` fails the same way
@@ -114,8 +120,6 @@ final class CLIRunTests: XCTestCase {
     }
 
     func testUpcomingRejectsDaysBelowOne() {
-        XCTAssertThrowsError(try CLI.runCommand(["upcoming", "--days", "0"])) { error in
-            XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
-        }
+        assertUsageError(["upcoming", "--days", "0"], contains: "--days must be at least 1")
     }
 }

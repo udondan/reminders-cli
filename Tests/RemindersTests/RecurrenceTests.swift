@@ -136,7 +136,10 @@ final class RecurrenceTests: XCTestCase {
                 recurrence: nil,
                 interval: nil,
                 end: .date(end)
-            ).rule(replacing: nil))
+            ).rule(replacing: nil)
+        ) { error in
+            XCTAssertEqual(error as? RecurrenceUpdateError, .missingExistingRule)
+        }
     }
 
     func testDateOnlyEndIncludesWholeLocalDay() throws {
@@ -253,26 +256,66 @@ final class RecurrenceTests: XCTestCase {
     }
 
     func testAddRejectsExplicitIntervalWithoutRecurrence() throws {
-        XCTAssertThrowsError(
-            try CLI.parseAsRoot([
-                "add", "Soon", "Medicine", "--due-date", "2026-09-01 09:00",
-                "--repeat-interval", "1",
-            ]))
+        let message = "--repeat-interval and --repeat-until require --repeat or --repeat-on"
+        assertParseError(
+            ["add", "Soon", "Medicine", "--due-date", "2026-09-01 09:00", "--repeat-interval", "1"],
+            contains: message)
+        assertParseError(
+            ["add", "Soon", "Medicine", "--due-date", "2026-09-01 09:00", "--repeat-until", "2026-12-31"],
+            contains: message)
     }
 
     func testAddRequiresDueDateForRecurrence() throws {
-        XCTAssertThrowsError(
-            try CLI.parseAsRoot([
-                "add", "Soon", "Medicine", "--repeat", "daily",
-            ]))
+        assertParseError(
+            ["add", "Soon", "Medicine", "--repeat", "daily"], contains: "--repeat requires --due-date")
     }
 
     func testAddRejectsRepeatEndBeforeDueDate() throws {
-        XCTAssertThrowsError(
-            try CLI.parseAsRoot([
+        assertParseError(
+            [
                 "add", "Soon", "Medicine", "--due-date", "2026-09-10 09:00",
                 "--repeat", "daily", "--repeat-until", "2026-09-09",
+            ],
+            contains: "--repeat-until cannot be earlier than --due-date")
+    }
+
+    func testAddAcceptsRepeatEndOnTheDueDate() throws {
+        XCTAssertNoThrow(
+            try CLI.parseAsRoot([
+                "add", "Soon", "Medicine", "--due-date", "2026-09-10 09:00",
+                "--repeat", "daily", "--repeat-until", "2026-09-10",
             ]))
+    }
+
+    func testAddRejectsHourlyRepeat() throws {
+        assertParseError(
+            ["add", "Soon", "Medicine", "--due-date", "2026-09-10 09:00", "--repeat", "hourly"],
+            contains: "--repeat hourly is not supported")
+    }
+
+    func testAddRejectsRepeatIntervalBelowOne() throws {
+        assertParseError(
+            [
+                "add", "Soon", "Medicine", "--due-date", "2026-09-10 09:00",
+                "--repeat", "daily", "--repeat-interval", "0",
+            ],
+            contains: "--repeat-interval must be at least 1")
+    }
+
+    func testEditRejectsHourlyRepeat() throws {
+        assertParseError(
+            ["edit", "Soon", "0", "--repeat", "hourly"], contains: "--repeat hourly is not supported")
+    }
+
+    func testEditRejectsRepeatIntervalBelowOne() throws {
+        assertParseError(
+            ["edit", "Soon", "0", "--repeat-interval", "0"], contains: "--repeat-interval must be at least 1")
+    }
+
+    func testEditRejectsRepeatUntilWithClearRepeatEnd() throws {
+        assertParseError(
+            ["edit", "Soon", "0", "--repeat-until", "2026-09-10", "--clear-repeat-end"],
+            contains: "Specify only one of --repeat-until or --clear-repeat-end")
     }
 
     func testScheduleRequiresDueDateWhenRulesRemain() throws {
@@ -324,10 +367,9 @@ final class RecurrenceTests: XCTestCase {
     }
 
     func testEditRejectsClearRepeatWithEndUpdate() throws {
-        XCTAssertThrowsError(
-            try CLI.parseAsRoot([
-                "edit", "Soon", "0", "--clear-repeat", "--repeat-until", "2026-09-10",
-            ]))
+        assertParseError(
+            ["edit", "Soon", "0", "--clear-repeat", "--repeat-until", "2026-09-10"],
+            contains: "Cannot combine --clear-repeat with another repeat option")
     }
 
     func testLocalizedRecurrenceErrorIsHumanReadable() throws {
@@ -377,42 +419,42 @@ final class RecurrenceTests: XCTestCase {
     func testNextOccurrenceDailyStepsForward() throws {
         let anchor = utcDate(2026, 1, 1)
         let rule = Recurrence.daily.recurrenceRule(interval: 1, end: nil)
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 3, 12))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 3, 12), calendar: utcCalendar)
         XCTAssertEqual(next, utcDate(2026, 1, 4))
     }
 
     func testNextOccurrenceWeeklyStepsForward() throws {
         let anchor = utcDate(2026, 1, 1)
         let rule = Recurrence.weekly.recurrenceRule(interval: 1, end: nil)
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 11))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 11), calendar: utcCalendar)
         XCTAssertEqual(next, utcDate(2026, 1, 15))
     }
 
     func testNextOccurrenceMonthlyStepsForward() throws {
         let anchor = utcDate(2026, 1, 15)
         let rule = Recurrence.monthly.recurrenceRule(interval: 1, end: nil)
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 3, 1))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 3, 1), calendar: utcCalendar)
         XCTAssertEqual(next, utcDate(2026, 3, 15))
     }
 
     func testNextOccurrenceYearlyStepsForward() throws {
         let anchor = utcDate(2025, 6, 1)
         let rule = Recurrence.yearly.recurrenceRule(interval: 1, end: nil)
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2027, 1, 1))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2027, 1, 1), calendar: utcCalendar)
         XCTAssertEqual(next, utcDate(2027, 6, 1))
     }
 
     func testNextOccurrenceHonorsIntervalGreaterThanOne() throws {
         let anchor = utcDate(2026, 1, 1)
         let rule = Recurrence.daily.recurrenceRule(interval: 3, end: nil)
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 5))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 5), calendar: utcCalendar)
         XCTAssertEqual(next, utcDate(2026, 1, 7))
     }
 
     func testNextOccurrenceReturnsAnchorWhenReferenceDateIsBeforeIt() throws {
         let anchor = utcDate(2026, 1, 10)
         let rule = Recurrence.daily.recurrenceRule(interval: 1, end: nil)
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 1))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 1), calendar: utcCalendar)
         XCTAssertEqual(next, anchor)
     }
 
@@ -438,7 +480,7 @@ final class RecurrenceTests: XCTestCase {
         let anchor = utcDate(2026, 1, 1)
         let rule = Recurrence.daily.recurrenceRule(
             interval: 1, end: EKRecurrenceEnd(end: utcDate(2026, 1, 3)))
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 10))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 10), calendar: utcCalendar)
         XCTAssertNil(next)
     }
 
@@ -446,7 +488,7 @@ final class RecurrenceTests: XCTestCase {
         let anchor = utcDate(2026, 1, 1)
         let rule = Recurrence.daily.recurrenceRule(
             interval: 1, end: EKRecurrenceEnd(end: utcDate(2026, 1, 5)))
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 5))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 5), calendar: utcCalendar)
         XCTAssertEqual(next, utcDate(2026, 1, 5))
     }
 
@@ -454,7 +496,7 @@ final class RecurrenceTests: XCTestCase {
         let anchor = utcDate(2026, 1, 1)
         let rule = Recurrence.daily.recurrenceRule(
             interval: 1, end: EKRecurrenceEnd(occurrenceCount: 3))
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 10))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 10), calendar: utcCalendar)
         XCTAssertNil(next)
     }
 
@@ -462,7 +504,7 @@ final class RecurrenceTests: XCTestCase {
         let anchor = utcDate(2026, 1, 1)
         let rule = Recurrence.daily.recurrenceRule(
             interval: 1, end: EKRecurrenceEnd(occurrenceCount: 3))
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 3))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 3), calendar: utcCalendar)
         XCTAssertEqual(next, utcDate(2026, 1, 3))
     }
 
@@ -478,7 +520,7 @@ final class RecurrenceTests: XCTestCase {
             daysOfTheYear: nil,
             setPositions: nil,
             end: nil)
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 3, 1))
+        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 3, 1), calendar: utcCalendar)
         XCTAssertNil(next)
     }
 
@@ -528,18 +570,27 @@ final class RecurrenceTests: XCTestCase {
     }
 
     func testNextWeekdayOccurrenceUsesRuleWeekStartForInterval() throws {
-        // EventKit sets a new rule's firstDayOfTheWeek from the locale. With Monday-started
-        // weeks the Sunday after a Monday anchor is in the anchor's week; with Sunday-started
-        // weeks it's already the (skipped) next week.
+        // With Monday-started weeks the Sunday after a Monday anchor is in the anchor's week;
+        // with Sunday-started weeks it's already the (skipped) next week.
         let rule = try weeklyRule(on: "sun", interval: 2)
-        let next = nextOccurrence(
-            of: rule, anchoredAt: utcDate(2026, 1, 5, 9), onOrAfter: utcDate(2026, 1, 6),
-            calendar: utcCalendar)
-        switch rule.firstDayOfTheWeek {
-        case 2: XCTAssertEqual(next, utcDate(2026, 1, 11, 9))
-        case 0, 1: XCTAssertEqual(next, utcDate(2026, 1, 18, 9))
-        default: XCTAssertNotNil(next)
-        }
+        let anchor = utcDate(2026, 1, 5, 9)
+        let reference = utcDate(2026, 1, 6)
+
+        setWeekStart(of: rule, to: 2)
+        XCTAssertEqual(
+            nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: reference, calendar: utcCalendar),
+            utcDate(2026, 1, 11, 9))
+        setWeekStart(of: rule, to: 1)
+        XCTAssertEqual(
+            nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: reference, calendar: utcCalendar),
+            utcDate(2026, 1, 18, 9))
+    }
+
+    /// EventKit sets a new rule's `firstDayOfTheWeek` from the machine's locale and has no public
+    /// setter; pinning it keeps the week-start tests from checking only the local branch.
+    private func setWeekStart(of rule: EKRecurrenceRule, to weekday: Int) {
+        rule.setValue(weekday, forKey: "firstDayOfTheWeek")
+        XCTAssertEqual(rule.firstDayOfTheWeek, weekday)
     }
 
     func testNextWeekdayOccurrenceReturnsAnchorWhenReferenceDateIsBeforeIt() throws {
@@ -604,14 +655,17 @@ final class RecurrenceTests: XCTestCase {
         // replayed case) the Sunday belongs to the week before, so the app moved it to the
         // Monday eight days later rather than the next day.
         let rule = try weeklyRule(on: "mon", interval: 2)
-        let next = nextOccurrence(
-            of: rule, anchoredAt: utcDate(2026, 9, 20, 7), onOrAfter: utcDate(2026, 9, 20, 8),
-            calendar: utcCalendar)
-        switch rule.firstDayOfTheWeek {
-        case 2: XCTAssertEqual(next, utcDate(2026, 9, 28, 7))
-        case 0, 1: XCTAssertEqual(next, utcDate(2026, 9, 21, 7))
-        default: XCTAssertNotNil(next)
-        }
+        let anchor = utcDate(2026, 9, 20, 7)
+        let reference = utcDate(2026, 9, 20, 8)
+
+        setWeekStart(of: rule, to: 2)
+        XCTAssertEqual(
+            nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: reference, calendar: utcCalendar),
+            utcDate(2026, 9, 28, 7))
+        setWeekStart(of: rule, to: 1)
+        XCTAssertEqual(
+            nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: reference, calendar: utcCalendar),
+            utcDate(2026, 9, 21, 7))
     }
 
     func testNextWeekdayOccurrenceMatchesAppForOverdueReminder() throws {
@@ -791,25 +845,25 @@ final class RecurrenceTests: XCTestCase {
     }
 
     func testAddRejectsRepeatOnWithoutDueDate() throws {
-        XCTAssertThrowsError(
-            try CLI.parseAsRoot(["add", "Soon", "Standup", "--repeat-on", "mon"]))
+        assertParseError(
+            ["add", "Soon", "Standup", "--repeat-on", "mon"], contains: "--repeat-on requires --due-date")
     }
 
     func testAddRejectsRepeatOnWithNonWeeklyRepeat() throws {
         for frequency in ["daily", "monthly", "yearly"] {
-            XCTAssertThrowsError(
-                try CLI.parseAsRoot([
+            assertParseError(
+                [
                     "add", "Soon", "Standup", "--due-date", "2026-09-01 09:00",
                     "--repeat", frequency, "--repeat-on", "mon",
-                ]))
+                ],
+                contains: "--repeat-on requires --repeat weekly")
         }
     }
 
     func testAddRejectsUnknownRepeatDay() throws {
-        XCTAssertThrowsError(
-            try CLI.parseAsRoot([
-                "add", "Soon", "Standup", "--due-date", "2026-09-01 09:00", "--repeat-on", "mon,someday",
-            ]))
+        assertParseError(
+            ["add", "Soon", "Standup", "--due-date", "2026-09-01 09:00", "--repeat-on", "mon,someday"],
+            contains: "Unknown day 'someday'")
     }
 
     func testEditAcceptsRepeatOnAlone() throws {
@@ -818,20 +872,21 @@ final class RecurrenceTests: XCTestCase {
     }
 
     func testEditRejectsRepeatOnWithClearRepeatOn() throws {
-        XCTAssertThrowsError(
-            try CLI.parseAsRoot(["edit", "Soon", "0", "--repeat-on", "mon", "--clear-repeat-on"]))
+        assertParseError(
+            ["edit", "Soon", "0", "--repeat-on", "mon", "--clear-repeat-on"],
+            contains: "Cannot specify both --repeat-on and --clear-repeat-on")
     }
 
     func testEditRejectsClearRepeatWithRepeatOn() throws {
-        XCTAssertThrowsError(
-            try CLI.parseAsRoot(["edit", "Soon", "0", "--clear-repeat", "--repeat-on", "mon"]))
-        XCTAssertThrowsError(
-            try CLI.parseAsRoot(["edit", "Soon", "0", "--clear-repeat", "--clear-repeat-on"]))
+        let message = "Cannot combine --clear-repeat with another repeat option"
+        assertParseError(["edit", "Soon", "0", "--clear-repeat", "--repeat-on", "mon"], contains: message)
+        assertParseError(["edit", "Soon", "0", "--clear-repeat", "--clear-repeat-on"], contains: message)
     }
 
     func testEditRejectsRepeatOnWithNonWeeklyRepeat() throws {
-        XCTAssertThrowsError(
-            try CLI.parseAsRoot(["edit", "Soon", "0", "--repeat", "monthly", "--repeat-on", "mon"]))
+        let message = "--repeat-on and --clear-repeat-on require a weekly repeat"
+        assertParseError(["edit", "Soon", "0", "--repeat", "monthly", "--repeat-on", "mon"], contains: message)
+        assertParseError(["edit", "Soon", "0", "--repeat", "daily", "--clear-repeat-on"], contains: message)
     }
 
     func testNextDueDateReturnsNilWithoutRecurrenceRule() throws {
