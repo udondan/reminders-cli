@@ -40,6 +40,61 @@ jobs:
         if: steps.changes.outputs.code == 'true'
         run: swift test -Xswiftc -warnings-as-errors
 
+  live-test:
+    # Exercises the real EventKit store end to end against a throwaway list, covering the store
+    # I/O the unit tests can't reach (fetch, save, commit, create and delete lists). It only works
+    # because hosted runners disable SIP, which lets us grant Reminders access without the prompt.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-14, macos-15]
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      # The test asserts exact UTC due dates from timezone-free date strings, so pin the runner's
+      # timezone rather than depend on it defaulting to UTC.
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: changes
+        with:
+          filters: |
+            code:
+              - Sources/**
+              - .github/scripts/live-test/**
+              - .github/workflows/mr-test.yml
+              - Package.swift
+              - Package.resolved
+
+      - name: xcode-select
+        if: steps.changes.outputs.code == 'true' && matrix.os == 'macos-14'
+        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+
+      - name: Build
+        if: steps.changes.outputs.code == 'true'
+        run: swift build
+
+      - name: Grant Reminders access
+        if: steps.changes.outputs.code == 'true'
+        run: bash .github/scripts/live-test/grant-reminders-access.sh .build/debug/reminders
+
+      - name: Live test
+        if: steps.changes.outputs.code == 'true'
+        timeout-minutes: 5
+        run: |
+          set +e
+          bash .github/scripts/live-test/live-test.sh .build/debug/reminders
+          code=$?
+          if [ "$code" = 20 ]; then
+            echo "::warning::Skipped: this runner has no reminder source to hold a new list."
+            exit 0
+          fi
+          exit $code
+
   skill-docs:
     runs-on: ubuntu-latest
     permissions:
