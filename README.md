@@ -339,6 +339,9 @@ $ reminders show-all --priority high --priority medium
 $ reminders show-all --search groceries
 A8C3D7F6-5E9B-4C2A-DF76-0B1D4E5F6071: Buy groceries
 
+$ reminders show-all --flagged
+44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago) (flagged)
+
 $ reminders show-all --list Soon --list Work
 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
@@ -360,6 +363,13 @@ $ reminders show-all --include-completed --completed-since monday
 - `--completed-since` accepts the same natural-language dates as `--due-date`/`--due-after`, uses
   an inclusive lower bound against each reminder's completion time, and requires
   `--only-completed` or `--include-completed`, since there's nothing to filter otherwise.
+- `--flagged` shows only reminders flagged in Reminders.app. Plain output marks them with a
+  `(flagged)` suffix, and JSON output has an `isFlagged` boolean on every reminder.
+  - The flagged state is **read-only**: the CLI can't set or clear it yet
+    ([#63](https://github.com/udondan/reminders-cli/issues/63)).
+  - EventKit has no public flag property, so the CLI reads it through undocumented EventKit
+    internals ([#51](https://github.com/udondan/reminders-cli/issues/51)). If a macOS version
+    doesn't expose them, every reminder reads as not flagged instead of failing.
 
 ### Sort reminders
 

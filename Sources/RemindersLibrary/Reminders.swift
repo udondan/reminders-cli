@@ -75,7 +75,8 @@ private func format(_ reminder: EKReminder, id: String, listName: String? = nil)
     // EventKit stores cleared notes as "" rather than nil; both mean "no notes".
     let notesString = reminder.notes.flatMap { $0.isEmpty ? nil : " (\($0))" } ?? ""
     let recurrenceString = formattedRecurrence(from: reminder).map { " (\($0))" } ?? ""
-    return "\(listString)\(id): \(reminder.title ?? "<unknown>")\(notesString)\(dateString)\(priorityString)\(recurrenceString)"
+    let flaggedString = reminder.isFlagged ? " (flagged)" : ""
+    return "\(listString)\(id): \(reminder.title ?? "<unknown>")\(notesString)\(dateString)\(priorityString)\(recurrenceString)\(flaggedString)"
 }
 
 /// The one definition of "overdue" in the CLI, shared by `show --overdue` and the counts of
@@ -90,7 +91,8 @@ func isOverdue(_ reminder: EKReminder, now: Date) -> Bool {
 // `dueBefore`, `dueAfter`, and `completedSince` are resolved to concrete `Date`s once per command
 // invocation by the caller, not per reminder. Kept internal (not private) so it's directly
 // unit-testable via `@testable import`, matching `recurrenceEndDate`/`nextOccurrence` elsewhere in
-// this file.
+// this file. `isFlagged` is injectable because a test can't flag an `EKReminder` (the flag is not
+// part of the public EventKit API, see `flaggedKeyPath`).
 func matchesAdditionalFilters(
     _ reminder: EKReminder,
     now: Date,
@@ -100,10 +102,15 @@ func matchesAdditionalFilters(
     noDueDate: Bool,
     priorities: [Priority],
     search: String?,
-    completedSince: Date? = nil
+    completedSince: Date? = nil,
+    flagged: Bool = false,
+    isFlagged: (EKReminder) -> Bool = { $0.isFlagged }
 ) -> Bool {
     let reminderDueDate = reminder.dueDateComponents?.date
 
+    if flagged && !isFlagged(reminder) {
+        return false
+    }
     if noDueDate && reminderDueDate != nil {
         return false
     }
@@ -671,7 +678,7 @@ public final class Reminders {
         dueOn dueDate: DateComponents?, includeOverdue: Bool,
         overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
         noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
-        lists: [String] = [], completedSince: DateComponents? = nil,
+        lists: [String] = [], completedSince: DateComponents? = nil, flagged: Bool = false,
         displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder
     ) throws {
         let calendar = Calendar.current
@@ -713,7 +720,7 @@ public final class Reminders {
             guard matchesAdditionalFilters(
                 reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
                 dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search,
-                completedSince: completedSinceDate
+                completedSince: completedSinceDate, flagged: flagged
             ) else {
                 continue
             }
@@ -735,7 +742,7 @@ public final class Reminders {
         withNameOrId nameOrId: String, dueOn dueDate: DateComponents?, includeOverdue: Bool,
         overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
         noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
-        completedSince: DateComponents? = nil,
+        completedSince: DateComponents? = nil, flagged: Bool = false,
         displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder)
         throws
     {
@@ -772,7 +779,7 @@ public final class Reminders {
             guard matchesAdditionalFilters(
                 reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
                 dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search,
-                completedSince: completedSinceDate
+                completedSince: completedSinceDate, flagged: flagged
             ) else {
                 continue
             }

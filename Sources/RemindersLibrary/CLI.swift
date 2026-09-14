@@ -83,6 +83,9 @@ private struct ShowAll: FormattedCommand {
     @Option(help: "Only show reminders whose title or notes contain this text (case-insensitive)")
     var search: String?
 
+    @Flag(help: "Only show flagged reminders")
+    var flagged = false
+
     @Option(help: "Only show reminders from this list (name, unique part of a name, or ID); repeat to specify multiple")
     var list: [String] = []
 
@@ -124,7 +127,7 @@ private struct ShowAll: FormattedCommand {
             dueOn: self.dueDate, includeOverdue: self.includeOverdue,
             overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
             noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
-            lists: self.list, completedSince: self.completedSince,
+            lists: self.list, completedSince: self.completedSince, flagged: self.flagged,
             displayOptions: displayOptions, outputFormat: format, sort: sort, sortOrder: sortOrder)
     }
 }
@@ -180,6 +183,9 @@ private struct Show: FormattedCommand {
     @Option(help: "Only show reminders whose title or notes contain this text (case-insensitive)")
     var search: String?
 
+    @Flag(help: "Only show flagged reminders")
+    var flagged = false
+
     @Option(help: "Only show completed reminders completed on or after this date")
     var completedSince: DateComponents?
 
@@ -218,7 +224,7 @@ private struct Show: FormattedCommand {
             withNameOrId: self.listNameOrId, dueOn: self.dueDate, includeOverdue: self.includeOverdue,
             overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
             noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
-            completedSince: self.completedSince,
+            completedSince: self.completedSince, flagged: self.flagged,
             displayOptions: displayOptions, outputFormat: format, sort: sort, sortOrder: sortOrder)
     }
 }

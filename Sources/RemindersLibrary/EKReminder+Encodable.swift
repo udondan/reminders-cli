@@ -22,6 +22,7 @@ extension EKReminder: @retroactive Encodable {
         case recurrenceEnd
         case recurrenceCount
         case hasRecurrence
+        case isFlagged
         case nextDueDate
     }
 
@@ -71,6 +72,7 @@ extension EKReminder: @retroactive Encodable {
         }
 
         try container.encode(self.recurrenceRules?.first != nil, forKey: .hasRecurrence)
+        try container.encode(self.isFlagged, forKey: .isFlagged)
 
         if let rule = self.recurrenceRules?.first {
             try container.encodeIfPresent(recurrenceName(for: rule.frequency), forKey: .recurrence)
