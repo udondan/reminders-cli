@@ -9,9 +9,19 @@ private let accessFreeFlags: Set<String> = [
     "-h",
 ]
 
+/// Subcommands that must run without requesting access. `doctor` reports the authorization
+/// state, so requesting access first would change (or hang on) the very thing it diagnoses.
+private let accessFreeSubcommands: Set<String> = [
+    "doctor",
+]
+
 public enum AccessRequirement {
     public static func requiresReminderAccess(arguments: [String]) -> Bool {
-        if arguments.isEmpty {
+        guard let first = arguments.first else {
+            return false
+        }
+        // The root command has no options of its own, so a subcommand is always the first argument.
+        if accessFreeSubcommands.contains(first) {
             return false
         }
         return !arguments.contains { accessFreeFlags.contains($0) }

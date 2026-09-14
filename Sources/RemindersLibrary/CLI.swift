@@ -749,6 +749,23 @@ private struct NewList: FormattedCommand {
     }
 }
 
+private struct Doctor: FormattedCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Check Reminders access and the environment, and suggest fixes (exits 1 when a check fails)")
+
+    @Option(
+        name: .shortAndLong,
+        help: "Output format (plain or json)")
+    var format: OutputFormat = .plain
+
+    func run() throws {
+        // The report is already on stdout; a failed check only changes the exit status.
+        if !reminders.runDoctor(outputFormat: format) {
+            throw ExitCode.failure
+        }
+    }
+}
+
 /// What happened when a command was run in-process, so tests can assert on it without the
 /// process exiting.
 enum CLIRunOutcome: Equatable {
@@ -807,6 +824,7 @@ public struct CLI: ParsableCommand {
             Today.self,
             Overdue.self,
             Upcoming.self,
+            Doctor.self,
         ]
     )
 
