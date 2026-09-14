@@ -110,7 +110,7 @@ private struct ShowAll: FormattedCommand {
     func validate() throws {
         if self.onlyCompleted && self.includeCompleted {
             throw ValidationError(
-                "Cannot specify both --show-completed and --only-completed")
+                "Cannot specify both --include-completed and --only-completed")
         }
         if self.noDueDate
             && (self.dueDate != nil || self.dueBefore != nil || self.dueAfter != nil
@@ -320,7 +320,7 @@ private struct Show: FormattedCommand {
     func validate() throws {
         if self.onlyCompleted && self.includeCompleted {
             throw ValidationError(
-                "Cannot specify both --show-completed and --only-completed")
+                "Cannot specify both --include-completed and --only-completed")
         }
         if self.noDueDate
             && (self.dueDate != nil || self.dueBefore != nil || self.dueAfter != nil
