@@ -19,7 +19,7 @@ allowed-tools: Bash(reminders:*)
 1. **Always pass `--format json`.** Every subcommand supports it. Parse the output instead of the plain-text format.
 2. **Always act on reminders by ID.** Every reminder has a stable `externalId`. Look it up with `show` or `show-all`, then pass it to `edit`, `complete`, `uncomplete`, `postpone` and `delete`. Never match reminders by title.
 3. Wherever a `<list>` argument is accepted, either the list name or its `calendarIdentifier` (from `show-lists --format json`) works. Prefer the ID when the name is ambiguous or contains shell-unfriendly characters.
-4. `show`, `show-all` and `show-lists` print a JSON array. `add`, `edit`, `complete`, `uncomplete`, `postpone` and `delete` print the affected reminder as a single JSON object (for `delete`, the reminder as it was before removal). `new-list` prints the created list. Keys are sorted alphabetically.
+4. `show`, `show-all`, `today`, `overdue`, `upcoming` and `show-lists` print a JSON array. `add`, `edit`, `complete`, `uncomplete`, `postpone` and `delete` print the affected reminder as a single JSON object (for `delete`, the reminder as it was before removal). `new-list` prints the created list. Keys are sorted alphabetically.
 5. Reminder text and notes are passed as trailing positional arguments and may contain spaces; quote them.
 6. `delete` finds a reminder by ID regardless of completion state, so completed reminders need no special handling.
 
@@ -30,6 +30,9 @@ allowed-tools: Bash(reminders:*)
 | `reminders show-lists` | Lists with their open and overdue reminder counts. `--default-only`/`-d` (only the list Reminders.app adds to by default), `--include-completed` (also count completed reminders, slower), `--sort`/`-s <none\|name\|open\|overdue>` |
 | `reminders show <list>` | Reminders on one list. Filters: `--only-completed`, `--include-completed`, `--include-overdue` (with `--due-date`, also include items due before that date), `--due-date`/`-d <date>`, `--overdue`, `--due-before <date>`, `--due-after <date>`, `--no-due-date`, `--priority <none\|low\|medium\|high>` (repeatable), `--search <text>` (case-insensitive, matches title or notes), `--flagged`, `--completed-since <date>`. Sorting: `--sort`/`-s <none\|creation-date\|due-date\|priority>`, `--sort-order`/`-o <ascending\|descending>` |
 | `reminders show-all` | Reminders across all lists. Same filters and sorting as `show`, plus `--list <list>` (repeatable) to restrict to some lists |
+| `reminders today` | Incomplete reminders due today plus overdue ones, across all lists. `--no-overdue` (only due today), `--list <list>` (repeatable), `--sort`/`--sort-order` (default due date ascending) |
+| `reminders overdue` | Incomplete reminders whose due date has passed. `--list <list>` (repeatable), `--sort`/`--sort-order` (default due date ascending) |
+| `reminders upcoming` | Incomplete reminders due from now through the end of the day N days ahead. `--days <n>` (default 7), `--include-overdue` (also past-due ones), `--list <list>` (repeatable), `--sort`/`--sort-order` (default due date ascending) |
 | `reminders add <list> <text...>` | `--due-date`/`-d <date>`, `--priority`/`-p <none\|low\|medium\|high>`, `--notes`/`-n <text>`, `--repeat <daily\|weekly\|monthly\|yearly>`, `--repeat-interval <n>`, `--repeat-until <date>` |
 | `reminders edit <list> <id> [new text...]` | `--due-date`/`-d <date>`, `--clear-due-date`, `--priority`/`-p <value>`, `--clear-priority`, `--notes`/`-n <text>` (overwrites), `--clear-notes`, `--list <list>` (move to another list), `--repeat <frequency>`, `--repeat-interval <n>`, `--repeat-until <date>`, `--clear-repeat-end` (repeat forever), `--clear-repeat` |
 | `reminders complete <list> <id>` | Mark done |
@@ -47,6 +50,7 @@ Constraints enforced by the CLI (violations are usage errors, exit status 64):
 - `add`: `--repeat` requires `--due-date`. `--repeat-interval` and `--repeat-until` require `--repeat`. `--repeat-interval` must be at least 1. `--repeat-until` must not be earlier than `--due-date`. `hourly` is rejected because EventKit reminders have no hourly frequency.
 - `edit`: at least one change is required. `--due-date`/`--clear-due-date`, `--priority`/`--clear-priority` and `--notes`/`--clear-notes` are pairwise exclusive. `--clear-repeat` cannot be combined with other repeat options. Changing only the interval or end keeps the existing frequency. Changing the frequency resets the interval to 1 unless `--repeat-interval` is given.
 - `postpone`: exactly one of `date` or `--next-weekday`.
+- `upcoming`: `--days` must be at least 1.
 - `--sort priority` orders high, medium, low, then none, with due date ascending as the tiebreaker. `--sort due-date` always puts reminders without a due date last.
 - `show-lists --sort name` is ascending and case-insensitive; `--sort open` and `--sort overdue` are descending (busiest list first) with the name as the tiebreaker. `show-lists` has no `--sort-order`.
 

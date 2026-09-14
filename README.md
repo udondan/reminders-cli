@@ -315,6 +315,36 @@ $ reminders show Soon --due-date today --include-overdue
 B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
 ```
 
+The three most common views have shortcuts across all lists, sorted by due date with the earliest
+first:
+
+```console
+$ reminders today
+Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
+Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+
+$ reminders overdue
+Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (2 days ago)
+
+$ reminders upcoming --days 14
+Soon: B3D8E2A1-9F4C-4D7B-8A21-5C6E9F0A1B2C: Contribute to open source (in 3 hours)
+Work: E6A1B5D4-3C7F-4A0E-BD54-8F9B2C3D4E5F: Renew passport (in 2 weeks)
+```
+
+| Command | Same as |
+| --- | --- |
+| `today` | `show-all --due-date today --include-overdue --sort due-date` |
+| `today --no-overdue` | `show-all --due-date today --sort due-date` |
+| `overdue` | `show-all --overdue --sort due-date` |
+| `upcoming` | `show-all --due-after <current time> --due-before "in 7 days" --sort due-date` |
+| `upcoming --include-overdue` | `show-all --due-before "in 7 days" --sort due-date` |
+
+- `upcoming --days <n>` sets how many days ahead to look (default 7, at least 1), including the
+  whole last day.
+- All three accept `--list` (repeatable), `--format`, and `--sort`/`--sort-order` to override the
+  due-date order, with the same meaning as on `show-all`. Their plain and JSON output is the same
+  as `show-all`'s.
+
 ### Filter reminders
 
 `show` and `show-all` support additional, freely combinable filters (all ANDed together, and
