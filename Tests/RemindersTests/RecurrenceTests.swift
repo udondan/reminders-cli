@@ -416,6 +416,24 @@ final class RecurrenceTests: XCTestCase {
         XCTAssertEqual(next, anchor)
     }
 
+    // Issue #73: an overdue reminder skips every missed occurrence instead of advancing by one
+    // interval from its due date, the same date completing it moves it to.
+    func testNextOccurrenceSkipsMissedOccurrencesOfOverdueReminder() throws {
+        let rule = Recurrence.weekly.recurrenceRule(interval: 2, end: nil)
+        let next = nextOccurrence(
+            of: rule, anchoredAt: utcDate(2025, 10, 25), onOrAfter: utcDate(2026, 9, 14),
+            calendar: utcCalendar)
+        XCTAssertEqual(next, utcDate(2026, 9, 26))
+    }
+
+    func testNextOccurrenceReturnsOccurrenceAtReferenceDate() throws {
+        let rule = Recurrence.weekly.recurrenceRule(interval: 2, end: nil)
+        let next = nextOccurrence(
+            of: rule, anchoredAt: utcDate(2025, 10, 25), onOrAfter: utcDate(2026, 9, 12),
+            calendar: utcCalendar)
+        XCTAssertEqual(next, utcDate(2026, 9, 12))
+    }
+
     func testNextOccurrenceReturnsNilPastEndDate() throws {
         let anchor = utcDate(2026, 1, 1)
         let rule = Recurrence.daily.recurrenceRule(

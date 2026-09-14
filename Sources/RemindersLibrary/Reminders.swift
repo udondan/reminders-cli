@@ -629,7 +629,9 @@ func validateRecurrenceSchedule(
 // occurrences pass -- it stays at whatever it was last set to, and can end up
 // arbitrarily far overdue. `nextOccurrence` computes what the next actionable
 // due date would be instead, by stepping the rule's frequency/interval
-// forward from its anchor date. It handles the rules this CLI itself creates
+// forward from its anchor date to the first occurrence at or after the
+// reference date, skipping every missed one -- the date Reminders.app moves a
+// reminder to when it's completed. It handles the rules this CLI itself creates
 // and edits: plain daily/weekly/monthly/yearly + interval, and weekly rules
 // on a set of weekdays (`--repeat-on`). Any other EventKit-native selector
 // (`daysOfTheMonth`, a week-numbered day such as "the last Friday", etc. --

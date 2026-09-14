@@ -88,7 +88,7 @@ All dates are ISO 8601 strings in UTC (for example `2026-09-14T07:00:00Z`). Fiel
 | `recurrenceCount` | integer | optional | Number of occurrences. Only for count-ended rules (created by Reminders.app, not by this CLI). |
 | `hasRecurrence` | boolean | always | Whether a repeat rule is set. |
 | `isFlagged` | boolean | always | Whether the reminder is flagged. Read-only: no command can set or clear it. Reads `false` on macOS versions that don't expose the flag. |
-| `nextDueDate` | string | optional | Next actionable occurrence of a repeating reminder, computed by the CLI. Only present when `hasRecurrence` is true, `isCompleted` is false and the rule is a plain daily/weekly/monthly/yearly (+ interval) rule or a weekly rule on `recurrenceDays`. |
+| `nextDueDate` | string | optional | Next actionable occurrence of a repeating reminder, computed by the CLI: the first occurrence at or after now, counted from `dueDate` (equals `dueDate` while that is still ahead). Only present when `hasRecurrence` is true, `isCompleted` is false and the rule is a plain daily/weekly/monthly/yearly (+ interval) rule or a weekly rule on `recurrenceDays`. |
 <!-- json-fields:end -->
 
 `show-lists --format json` returns list objects with `title`, `calendarIdentifier`, `openCount` (reminders that are not completed) and `overdueCount` (of those, the ones whose due date has passed — the same definition as `show --overdue`). `completedCount` is present only with `--include-completed`. `new-list --format json` returns a list object with `title` and `calendarIdentifier` only. `delete-list --confirm --format json` returns `{deleted: true, title, calendarIdentifier, reminderCount}`.
@@ -118,7 +118,7 @@ Exit statuses 3 (`list_ambiguous`) and 5 (`reminder_ambiguous`) are reserved and
 
 ## Repeating reminders
 
-EventKit does not advance a repeating reminder's due date as occurrences pass. `dueDate` stays at whatever it was last set to and can be arbitrarily far in the past. When you need the next occurrence, read `nextDueDate`. It is computed for weekly rules on days (`--repeat-on`) too, but absent for other EventKit-native selectors such as "the last Friday of every month", which this CLI cannot create; in that case fall back to `dueDate` and say so.
+EventKit does not advance a repeating reminder's due date as occurrences pass. `dueDate` stays at whatever it was last set to and can be arbitrarily far in the past. When you need the next occurrence, read `nextDueDate`. For an overdue reminder it skips every missed occurrence (including one earlier today; an all-day reminder's occurrence is at midnight) rather than adding one interval to `dueDate`, and it is the date completing the reminder moves it to. It is computed for weekly rules on days (`--repeat-on`) too, but absent for other EventKit-native selectors such as "the last Friday of every month", which this CLI cannot create; in that case fall back to `dueDate` and say so.
 
 To move a repeating reminder forward without changing its rule, use `postpone`.
 
