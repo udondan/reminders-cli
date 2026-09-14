@@ -104,6 +104,37 @@ long as it identifies exactly one reminder on the list, so `reminders complete S
 `reminder_ambiguous` together with the matching IDs and titles, and a prefix shorter than 4
 characters never matches anything (an exact full ID always does).
 
+### Pretty output
+
+For reading in a terminal, `show`, `show-all`, `today`, `overdue` and `upcoming` accept
+`--format pretty`: one section per list with open, overdue and completed counts, and aligned
+columns for due date, priority, repeat, flag, notes and the first 8 characters of the ID (enough to
+pass to `complete`, `edit` and friends).
+
+```console
+$ reminders show Soon --include-completed --format pretty
+Soon (3 open, 1 overdue, 1 completed)
+─────────────────────────────────────
+ ○ Ship reminders-cli         2d overdue  !!!  ↻ weekly  📝  44C111DE
+ ○ Contribute to open source  in 3h                          B3D8E2A1
+ ○ Read a book                                               F7B2C6E5
+ ✓ Write README               done Mon                       2A29C8B1
+```
+
+- `○` is an open reminder, `✓` a completed one. Due dates are relative (`2d overdue`, `today`,
+  `in 3h`, `tomorrow`, `in 3d`) and fall back to `Oct 4` beyond a week, `Oct 4 2027` in another
+  year. Priority is `!`, `!!` or `!!!`, and `📝` marks a reminder with notes.
+- `--verbose`/`-v` shows the first 60 characters of the notes under each title instead. It is only
+  accepted together with `--format pretty`.
+- Colours (red for overdue, yellow for due today, blue/yellow/red for priorities) are used only
+  when stdout is a terminal and [`NO_COLOR`](https://no-color.org) is not set; piped output keeps
+  the same layout without escape codes.
+- Set `REMINDERS_FORMAT=pretty` (or `plain`/`json`) to change the default format of these
+  commands. An explicit `--format` always wins, and errors are still printed in plain text.
+
+`pretty` output may change between releases; scripts should use `--format plain` or
+`--format json`, whose output does not change with this option.
+
 ### Complete an item on a list
 
 ```console

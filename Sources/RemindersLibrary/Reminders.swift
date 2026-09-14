@@ -71,7 +71,7 @@ extension EKReminder {
     }
 }
 
-private func format(_ reminder: EKReminder, id: String, listName: String? = nil) -> String {
+func format(_ reminder: EKReminder, id: String, listName: String? = nil) -> String {
     let dateString = formattedDueDate(from: reminder).map { " (\($0))" } ?? ""
     let priorityString = Priority(reminder.mappedPriority).map { " (priority: \($0))" } ?? ""
     let listString = listName.map { "\($0): " } ?? ""
@@ -86,7 +86,12 @@ private func format(_ reminder: EKReminder, id: String, listName: String? = nil)
 /// `show-lists` so the two views never disagree: a due date strictly before `now`, which the caller
 /// resolves once per command invocation. A reminder without a due date is never overdue.
 func isOverdue(_ reminder: EKReminder, now: Date) -> Bool {
-    return reminder.dueDateComponents?.date.map { $0 < now } ?? false
+    return isOverdue(dueDate: reminder.dueDateComponents?.date, now: now)
+}
+
+/// `isOverdue(_:now:)` on an already-resolved due date, for `pretty` output's `PrettyRow`.
+func isOverdue(dueDate: Date?, now: Date) -> Bool {
+    return dueDate.map { $0 < now } ?? false
 }
 
 // Additional, independently-composable filters for `show`/`show-all`, ANDed together and ANDed
@@ -908,7 +913,8 @@ public final class Reminders {
         overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
         noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
         lists: [String] = [], completedSince: DateComponents? = nil, flagged: Bool = false,
-        displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder
+        displayOptions: DisplayOptions, outputFormat: ListingFormat, verbose: Bool = false, sort: Sort,
+        sortOrder: CustomSortOrder
     ) throws {
         let calendar = Calendar.current
         let now = Date()
@@ -964,16 +970,30 @@ public final class Reminders {
             for (reminder, id, listName) in matchingReminders {
                 print(format(reminder, id: id, listName: listName))
             }
+        case .pretty:
+            // One section per list, in the order of `calendars`, keeping the sorted order within it.
+            let byList = Dictionary(grouping: matchingReminders.map { $0.0 }) {
+                $0.calendar.calendarIdentifier
+            }
+            var seen = Set<String>()
+            let groups = calendars.compactMap { calendar -> PrettyGroup? in
+                guard seen.insert(calendar.calendarIdentifier).inserted,
+                      let reminders = byList[calendar.calendarIdentifier] else {
+                    return nil
+                }
+                return PrettyGroup(title: calendar.title, rows: reminders.map(PrettyRow.init))
+            }
+            printPretty(groups, now: now, verbose: verbose)
         }
     }
 
     /// Entry point of the `today`, `overdue` and `upcoming` commands: the same incomplete-reminder
     /// query `show-all` runs, with the parameters `ShowAllQuery` built.
-    func showAllReminders(_ query: ShowAllQuery, outputFormat: OutputFormat) throws {
+    func showAllReminders(_ query: ShowAllQuery, outputFormat: ListingFormat, verbose: Bool = false) throws {
         try self.showAllReminders(
             dueOn: query.dueOn, includeOverdue: query.includeOverdue, overdue: query.overdue,
             dueBefore: query.dueBefore, dueAfter: query.dueAfter, lists: query.lists,
-            displayOptions: .incomplete, outputFormat: outputFormat, sort: query.sort,
+            displayOptions: .incomplete, outputFormat: outputFormat, verbose: verbose, sort: query.sort,
             sortOrder: query.sortOrder)
     }
 
@@ -982,7 +1002,8 @@ public final class Reminders {
         overdue: Bool = false, dueBefore: DateComponents? = nil, dueAfter: DateComponents? = nil,
         noDueDate: Bool = false, priorities: [Priority] = [], search: String? = nil,
         completedSince: DateComponents? = nil, flagged: Bool = false,
-        displayOptions: DisplayOptions, outputFormat: OutputFormat, sort: Sort, sortOrder: CustomSortOrder)
+        displayOptions: DisplayOptions, outputFormat: ListingFormat, verbose: Bool = false, sort: Sort,
+        sortOrder: CustomSortOrder)
         throws
     {
         let reminderCalendar = try self.calendar(withNameOrId: nameOrId)
@@ -1033,6 +1054,10 @@ public final class Reminders {
             for (reminder, id) in matchingReminders {
                 print(format(reminder, id: id))
             }
+        case .pretty:
+            printPretty(
+                [PrettyGroup(title: reminderCalendar.title, rows: matchingReminders.map { PrettyRow($0.0) })],
+                now: now, verbose: verbose)
         }
     }
 
@@ -1395,6 +1420,12 @@ public final class Reminders {
 
     /// Every reminder on `calendars`. `show-lists` uses the predicate-taking overload below
     /// instead, to fetch only the incomplete ones.
+    private func printPretty(_ groups: [PrettyGroup], now: Date, verbose: Bool) {
+        for line in formatPretty(groups, now: now, style: .standardOutput, verbose: verbose) {
+            print(line)
+        }
+    }
+
     private func fetchReminders(on calendars: [EKCalendar], displayOptions: DisplayOptions) -> [EKReminder] {
         return self.fetchReminders(
             matching: Store.predicateForReminders(in: calendars), displayOptions: displayOptions)
