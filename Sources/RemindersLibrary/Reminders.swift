@@ -311,6 +311,33 @@ func resolveReminder(_ reminders: [EKReminder], idOrPrefix: String, onList nameO
     return reminders[index]
 }
 
+/// `resolveIdentifier` for every ID of a batch, in argument order. Throws for the first ID that is
+/// missing or ambiguous, so a batch either resolves completely or not at all. Several arguments
+/// naming the same reminder (a full ID and its prefix, say) yield it once.
+func resolveIdentifiers(
+    _ ids: [String], titles: [String], idsOrPrefixes: [String], onList nameOrId: String
+) throws -> [Int] {
+    var indices: [Int] = []
+    for idOrPrefix in idsOrPrefixes {
+        let index = try resolveIdentifier(ids, titles: titles, idOrPrefix: idOrPrefix, onList: nameOrId)
+        if !indices.contains(index) {
+            indices.append(index)
+        }
+    }
+    return indices
+}
+
+/// `resolveIdentifiers` over the reminders' external identifiers, see `resolveReminder`.
+func resolveReminders(
+    _ reminders: [EKReminder], idsOrPrefixes: [String], onList nameOrId: String
+) throws -> [EKReminder] {
+    try resolveIdentifiers(
+        reminders.map { $0.calendarItemExternalIdentifier ?? "" },
+        titles: reminders.map { $0.title ?? "<unknown>" },
+        idsOrPrefixes: idsOrPrefixes, onList: nameOrId
+    ).map { reminders[$0] }
+}
+
 public enum OutputFormat: String, ExpressibleByArgument {
     case json, plain
 
@@ -1140,7 +1167,7 @@ public final class Reminders {
     }
 
     func edit(
-        itemAtId id: String,
+        items selection: ReminderSelection,
         onListNamedOrId nameOrId: String,
         newText: String?,
         newNotes: String?,
@@ -1165,10 +1192,52 @@ public final class Reminders {
             || newRecurrenceDays != nil || clearRecurrenceDays
             || clearRecurrenceEnd
 
-        let reminder = try resolveReminder(
+        let reminders = try resolveReminders(
             self.fetchReminders(on: [calendar], displayOptions: .incomplete),
-            idOrPrefix: id, onList: nameOrId)
+            idsOrPrefixes: selection.ids, onList: nameOrId)
+        let newCalendar = try newListName.map { try self.calendar(withNameOrId: $0) }
 
+        try self.discardingChangesOnError {
+            for reminder in reminders {
+                try self.applyEdit(
+                    to: reminder, newText: newText, newNotes: newNotes, clearNotes: clearNotes,
+                    newDueDateComponents: newDueDateComponents, clearDueDate: clearDueDate,
+                    priority: priority, clearPriority: clearPriority, newCalendar: newCalendar,
+                    newRecurrence: newRecurrence, newRecurrenceInterval: newRecurrenceInterval,
+                    newRecurrenceEndDate: newRecurrenceEndDate, clearRecurrenceEnd: clearRecurrenceEnd,
+                    newRecurrenceDays: newRecurrenceDays, clearRecurrenceDays: clearRecurrenceDays,
+                    clearRecurrence: clearRecurrence,
+                    dueDateChangeRequested: dueDateChangeRequested,
+                    recurrenceChangeRequested: recurrenceChangeRequested)
+            }
+        }
+
+        try self.saveAll(reminders, action: "update reminder")
+        print(affectedOutput(reminders, selection: selection, outputFormat: outputFormat) {
+            "Updated reminder '\($0.title!)'"
+        })
+    }
+
+    /// One reminder's share of `edit`, changing it only in memory; `edit` saves the batch.
+    private func applyEdit(
+        to reminder: EKReminder,
+        newText: String?,
+        newNotes: String?,
+        clearNotes: Bool,
+        newDueDateComponents: DateComponents?,
+        clearDueDate: Bool,
+        priority: Priority?,
+        clearPriority: Bool,
+        newCalendar: EKCalendar?,
+        newRecurrence: Recurrence?, newRecurrenceInterval: Int?,
+        newRecurrenceEndDate: DateComponents?,
+        clearRecurrenceEnd: Bool,
+        newRecurrenceDays: RepeatDays?,
+        clearRecurrenceDays: Bool,
+        clearRecurrence: Bool,
+        dueDateChangeRequested: Bool,
+        recurrenceChangeRequested: Bool) throws
+    {
         reminder.title = newText ?? reminder.title
         if clearNotes {
             reminder.notes = nil
@@ -1181,8 +1250,8 @@ public final class Reminders {
             reminder.priority = Int(priority.value.rawValue)
         }
 
-        if let newListName {
-            reminder.calendar = try self.calendar(withNameOrId: newListName)
+        if let newCalendar {
+            reminder.calendar = newCalendar
         }
 
         if clearDueDate {
@@ -1263,107 +1332,98 @@ public final class Reminders {
         } catch let error as RecurrenceUpdateError {
             throw CLIError.invalidArgument(error.localizedDescription)
         }
-
-        try self.save(reminder, action: "update reminder")
-        switch outputFormat {
-        case .json:
-            print(encodeToJson(data: reminder))
-        case .plain:
-            print("Updated reminder '\(reminder.title!)'")
-        }
     }
 
     func postpone(
-        itemAtId id: String,
+        items selection: ReminderSelection,
         onListNamedOrId nameOrId: String,
         to newDueDateComponents: DateComponents?,
         toNextWeekday: Bool,
         outputFormat: OutputFormat) throws
     {
         let calendar = try self.calendar(withNameOrId: nameOrId)
-        let reminder = try resolveReminder(
+        let reminders = try resolveReminders(
             self.fetchReminders(on: [calendar], displayOptions: .incomplete),
-            idOrPrefix: id, onList: nameOrId)
+            idsOrPrefixes: selection.ids, onList: nameOrId)
 
-        let resolvedComponents: DateComponents
-        if toNextWeekday {
-            guard let currentDue = reminder.dueDateComponents,
-                let shifted = nextWeekday(after: currentDue)
-            else {
-                throw CLIError.noDueDate()
+        try self.discardingChangesOnError {
+            for reminder in reminders {
+                let resolvedComponents: DateComponents
+                if toNextWeekday {
+                    guard let currentDue = reminder.dueDateComponents,
+                        let shifted = nextWeekday(after: currentDue)
+                    else {
+                        throw CLIError.noDueDate()
+                    }
+                    resolvedComponents = shifted
+                } else if let newDueDateComponents {
+                    resolvedComponents = newDueDateComponents
+                } else {
+                    fatalError("postpone requires either a new due date or --next-weekday")
+                }
+
+                // recurrenceRules is never read or written here, so any
+                // existing repeat rule passes through completely unchanged.
+                reminder.dueDateComponents = resolvedComponents
+                for alarm in reminder.alarms ?? [] {
+                    reminder.removeAlarm(alarm)
+                }
+                if let date = resolvedComponents.date, resolvedComponents.hour != nil {
+                    reminder.addAlarm(EKAlarm(absoluteDate: date))
+                }
+
+                do {
+                    try validateRecurrenceSchedule(
+                        dueDateComponents: reminder.dueDateComponents,
+                        rules: reminder.recurrenceRules ?? [])
+                } catch let error as RecurrenceUpdateError {
+                    throw CLIError.invalidArgument(error.localizedDescription)
+                }
             }
-            resolvedComponents = shifted
-        } else if let newDueDateComponents {
-            resolvedComponents = newDueDateComponents
-        } else {
-            fatalError("postpone requires either a new due date or --next-weekday")
         }
 
-        // recurrenceRules is never read or written here, so any
-        // existing repeat rule passes through completely unchanged.
-        reminder.dueDateComponents = resolvedComponents
-        for alarm in reminder.alarms ?? [] {
-            reminder.removeAlarm(alarm)
-        }
-        if let date = resolvedComponents.date, resolvedComponents.hour != nil {
-            reminder.addAlarm(EKAlarm(absoluteDate: date))
-        }
-
-        do {
-            try validateRecurrenceSchedule(
-                dueDateComponents: reminder.dueDateComponents,
-                rules: reminder.recurrenceRules ?? [])
-        } catch let error as RecurrenceUpdateError {
-            throw CLIError.invalidArgument(error.localizedDescription)
-        }
-
-        try self.save(reminder, action: "postpone reminder")
-        switch outputFormat {
-        case .json:
-            print(encodeToJson(data: reminder))
-        case .plain:
-            print("Postponed reminder '\(reminder.title!)'")
-        }
+        try self.saveAll(reminders, action: "postpone reminder")
+        print(affectedOutput(reminders, selection: selection, outputFormat: outputFormat) {
+            "Postponed reminder '\($0.title!)'"
+        })
     }
 
-    func setComplete(_ complete: Bool, itemAtId id: String, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) throws {
+    func setComplete(
+        _ complete: Bool, items selection: ReminderSelection, onListNamedOrId nameOrId: String,
+        outputFormat: OutputFormat
+    ) throws {
         let calendar = try self.calendar(withNameOrId: nameOrId)
-        let reminder = try resolveReminder(
+        let reminders = try resolveReminders(
             self.fetchReminders(on: [calendar], displayOptions: complete ? .incomplete : .complete),
-            idOrPrefix: id, onList: nameOrId)
+            idsOrPrefixes: selection.ids, onList: nameOrId)
 
-        reminder.isCompleted = complete
-        try self.save(reminder, action: complete ? "complete reminder" : "uncomplete reminder")
-        switch outputFormat {
-        case .json:
-            print(encodeToJson(data: reminder))
-        case .plain:
-            print("\(complete ? "Completed" : "Uncompleted") '\(reminder.title!)'")
+        for reminder in reminders {
+            reminder.isCompleted = complete
         }
+        try self.saveAll(reminders, action: complete ? "complete reminder" : "uncomplete reminder")
+        print(affectedOutput(reminders, selection: selection, outputFormat: outputFormat) {
+            "\(complete ? "Completed" : "Uncompleted") '\($0.title!)'"
+        })
     }
 
-    func delete(itemAtId id: String, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) throws {
+    func delete(items selection: ReminderSelection, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) throws {
         let calendar = try self.calendar(withNameOrId: nameOrId)
         // External identifiers are stable regardless of completion state, so a
         // reminder already marked complete can still be found and deleted by its id.
-        let reminder = try resolveReminder(
+        let reminders = try resolveReminders(
             self.fetchReminders(on: [calendar], displayOptions: .all),
-            idOrPrefix: id, onList: nameOrId)
+            idsOrPrefixes: selection.ids, onList: nameOrId)
 
         // Encode before removing: the encoder reads `reminder.calendar`, which is
         // no longer meaningful once the reminder is gone from the store.
-        let confirmation: String
-        switch outputFormat {
-        case .json:
-            confirmation = encodeToJson(data: reminder)
-        case .plain:
-            confirmation = "Deleted '\(reminder.title!)'"
+        let confirmation = affectedOutput(reminders, selection: selection, outputFormat: outputFormat) {
+            "Deleted '\($0.title!)'"
         }
 
-        do {
-            try Store.remove(reminder, commit: true)
-        } catch let error {
-            throw CLIError.saveFailed(action: "delete reminder", underlying: error)
+        try self.commitAll(action: "delete reminder", count: reminders.count) {
+            for reminder in reminders {
+                try Store.remove(reminder, commit: false)
+            }
         }
         print(confirmation)
     }
@@ -1451,6 +1511,55 @@ public final class Reminders {
             try Store.save(reminder, commit: true)
         } catch let error {
             throw CLIError.saveFailed(action: action, underlying: error)
+        }
+    }
+
+    /// Saves every reminder of a batch in one commit.
+    private func saveAll(_ reminders: [EKReminder], action: String) throws {
+        try self.commitAll(action: action, count: reminders.count) {
+            for reminder in reminders {
+                try Store.save(reminder, commit: false)
+            }
+        }
+    }
+
+    /// Runs `stage` (saves or removes with `commit: false`), then commits them together. If
+    /// anything fails, the staged changes are discarded so the store is left as it was.
+    private func commitAll(action: String, count: Int, stage: () throws -> Void) throws {
+        do {
+            try stage()
+            try Store.commit()
+        } catch let error {
+            Store.reset()
+            throw CLIError.saveFailed(action: count > 1 ? action + "s" : action, underlying: error)
+        }
+    }
+
+    /// For changes made in memory before a batch is saved: a failure for one reminder (say, no
+    /// due date for `postpone --next-weekday`) discards the changes already made to the others.
+    private func discardingChangesOnError(_ body: () throws -> Void) rethrows {
+        do {
+            try body()
+        } catch {
+            Store.reset()
+            throw error
+        }
+    }
+
+    /// The confirmation for the reminders a command changed: one plain line each, or JSON — the
+    /// single object for a single ID argument, an array for a batch.
+    private func affectedOutput(
+        _ reminders: [EKReminder], selection: ReminderSelection, outputFormat: OutputFormat,
+        plainLine: (EKReminder) -> String
+    ) -> String {
+        switch outputFormat {
+        case .json:
+            if !selection.isBatch, let reminder = reminders.first {
+                return encodeToJson(data: reminder)
+            }
+            return encodeToJson(data: reminders)
+        case .plain:
+            return reminders.map(plainLine).joined(separator: "\n")
         }
     }
 
