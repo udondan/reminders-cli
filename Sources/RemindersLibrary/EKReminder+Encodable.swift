@@ -19,6 +19,7 @@ extension EKReminder: @retroactive Encodable {
         case listId
         case recurrence
         case recurrenceInterval
+        case recurrenceDays
         case recurrenceEnd
         case recurrenceCount
         case hasRecurrence
@@ -77,6 +78,9 @@ extension EKReminder: @retroactive Encodable {
         if let rule = self.recurrenceRules?.first {
             try container.encodeIfPresent(recurrenceName(for: rule.frequency), forKey: .recurrence)
             try container.encode(rule.interval, forKey: .recurrenceInterval)
+            if let weekdays = plainWeekdays(of: rule) {
+                try container.encode(weekdays.map(shortName(of:)), forKey: .recurrenceDays)
+            }
             try container.encodeIfPresent(format(rule.recurrenceEnd?.endDate), forKey: .recurrenceEnd)
             if let count = rule.recurrenceEnd?.occurrenceCount, count > 0 {
                 try container.encode(count, forKey: .recurrenceCount)
