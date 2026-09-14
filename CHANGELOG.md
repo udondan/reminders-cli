@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.4.0](https://github.com/udondan/reminders-cli/compare/v3.3.0...v3.4.0) (2026-09-14)
+
+
+### Features
+
+* add --repeat-on weekday selectors for weekly repeats ([#67](https://github.com/udondan/reminders-cli/issues/67)) ([b86cd23](https://github.com/udondan/reminders-cli/commit/b86cd2397038f73948eee20871a844bb9aea828f))
+* add delete-list subcommand with --confirm guard ([#70](https://github.com/udondan/reminders-cli/issues/70)) ([e3c838e](https://github.com/udondan/reminders-cli/commit/e3c838e261a9039f0885ac2b582003b2b03c99b7)), closes [#50](https://github.com/udondan/reminders-cli/issues/50)
+* add doctor subcommand for permission and environment diagnostics ([#69](https://github.com/udondan/reminders-cli/issues/69)) ([6738316](https://github.com/udondan/reminders-cli/commit/673831665189ac8f1d14533f0e6740ad1a0d6a59)), closes [#52](https://github.com/udondan/reminders-cli/issues/52)
+* add opt-in pretty output format for reminder listings ([#71](https://github.com/udondan/reminders-cli/issues/71)) ([c91cfc0](https://github.com/udondan/reminders-cli/commit/c91cfc02f8fa0f15877bee387953ca244b7aaf67)), closes [#54](https://github.com/udondan/reminders-cli/issues/54)
+* add today, overdue and upcoming subcommands ([#65](https://github.com/udondan/reminders-cli/issues/65)) ([131be42](https://github.com/udondan/reminders-cli/commit/131be42512f7e38573e46ab0bba130d75315c059))
+* show and filter by flagged status ([#64](https://github.com/udondan/reminders-cli/issues/64)) ([31c233d](https://github.com/udondan/reminders-cli/commit/31c233d6d0c52710c0eb0474b43ce421dcf3c2f6)), closes [#51](https://github.com/udondan/reminders-cli/issues/51)
+* show open and overdue reminder counts in show-lists ([#60](https://github.com/udondan/reminders-cli/issues/60)) ([50dd6c8](https://github.com/udondan/reminders-cli/commit/50dd6c8e990bc1868b4422818f5ccf95b6e1ba0c)), closes [#48](https://github.com/udondan/reminders-cli/issues/48)
+
+
+### Bug Fixes
+
+* apply --repeat rule when adding a reminder ([#66](https://github.com/udondan/reminders-cli/issues/66)) ([aa806a4](https://github.com/udondan/reminders-cli/commit/aa806a497c2806c3ab5e4268bdec1079d5047728))
+* omit nextDueDate for completed reminders ([#68](https://github.com/udondan/reminders-cli/issues/68)) ([3059841](https://github.com/udondan/reminders-cli/commit/305984167ae2af12a0a04f697e56708c70f4fcba))
+
 ## [3.3.0](https://github.com/udondan/reminders-cli/compare/v3.2.0...v3.3.0) (2026-09-13)
 
 
