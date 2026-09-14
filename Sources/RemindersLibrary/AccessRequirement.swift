@@ -11,8 +11,10 @@ private let accessFreeFlags: Set<String> = [
 
 /// Subcommands that must run without requesting access. `doctor` reports the authorization
 /// state, so requesting access first would change (or hang on) the very thing it diagnoses.
+/// `help` is ArgumentParser's built-in subcommand and only prints usage, like `--help`.
 private let accessFreeSubcommands: Set<String> = [
     "doctor",
+    "help",
 ]
 
 public enum AccessRequirement {

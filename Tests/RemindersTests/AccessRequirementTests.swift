@@ -22,6 +22,16 @@ final class AccessRequirementTests: XCTestCase {
         XCTAssertFalse(AccessRequirement.requiresReminderAccess(arguments: ["show", "--help"]))
     }
 
+    /// ArgumentParser's built-in `help` subcommand only prints usage, like `--help`.
+    func testHelpSubcommandDoesNotRequireAccess() {
+        XCTAssertFalse(AccessRequirement.requiresReminderAccess(arguments: ["help"]))
+        XCTAssertFalse(AccessRequirement.requiresReminderAccess(arguments: ["help", "show"]))
+    }
+
+    func testHelpAsAnArgumentStillRequiresAccess() {
+        XCTAssertTrue(AccessRequirement.requiresReminderAccess(arguments: ["add", "List", "help"]))
+    }
+
     /// `doctor` reports the authorization state, so it must never trigger the access prompt.
     func testDoctorDoesNotRequireAccess() {
         XCTAssertFalse(AccessRequirement.requiresReminderAccess(arguments: ["doctor"]))

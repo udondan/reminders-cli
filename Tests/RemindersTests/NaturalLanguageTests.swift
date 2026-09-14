@@ -5,9 +5,9 @@ import XCTest
 final class NaturalLanguageTests: XCTestCase {
     func testYesterday() throws {
         let components = try XCTUnwrap(DateComponents(argument: "yesterday"))
-        let tomorrow = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: -1, to: Date()))
+        let yesterday = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: -1, to: Date()))
         let expectedComponents = Calendar.current.dateComponents(
-            calendarComponents(except: timeComponents), from: tomorrow)
+            calendarComponents(except: timeComponents), from: yesterday)
 
         XCTAssertEqual(components, expectedComponents)
     }
@@ -63,18 +63,33 @@ final class NaturalLanguageTests: XCTestCase {
 
     func testRelativeDayCount() throws {
         let components = try XCTUnwrap(DateComponents(argument: "in 2 days"))
-        let tomorrow = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: 2, to: Date()))
+        let inTwoDays = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: 2, to: Date()))
         let expectedComponents = Calendar.current.dateComponents(
-            calendarComponents(except: timeComponents), from: tomorrow)
+            calendarComponents(except: timeComponents), from: inTwoDays)
 
         XCTAssertEqual(components, expectedComponents)
     }
 
-    func testNextSaturday() throws {
-        let components = try XCTUnwrap(DateComponents(argument: "next saturday"))
-        let date = try XCTUnwrap(Calendar.current.date(from: components))
+    /// Asserts that `argument` resolves to the given weekday within the next two weeks. Whether
+    /// "next saturday" means the coming one or the one after is up to `NSDataDetector`, so only
+    /// that window is pinned, not the exact day.
+    private func assertUpcoming(
+        _ argument: String, weekday: Int, hour: Int? = nil,
+        file: StaticString = #filePath, line: UInt = #line
+    ) throws {
+        let components = try XCTUnwrap(DateComponents(argument: argument), file: file, line: line)
+        let date = try XCTUnwrap(Calendar.current.date(from: components), file: file, line: line)
+        let today = Calendar.current.startOfDay(for: Date())
+        let twoWeeks = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: 15, to: today))
 
-        XCTAssertTrue(Calendar.current.isDateInWeekend(date))
+        XCTAssertEqual(Calendar.current.component(.weekday, from: date), weekday, argument, file: file, line: line)
+        XCTAssertGreaterThanOrEqual(date, today, argument, file: file, line: line)
+        XCTAssertLessThan(date, twoWeeks, argument, file: file, line: line)
+        XCTAssertEqual(components.hour, hour, argument, file: file, line: line)
+    }
+
+    func testNextSaturday() throws {
+        try assertUpcoming("next saturday", weekday: 7)
     }
 
     // FB8921206
@@ -88,8 +103,8 @@ final class NaturalLanguageTests: XCTestCase {
     }
 
     func testSpecificDays() throws {
-        XCTAssertNotNil(DateComponents(argument: "next monday"))
-        XCTAssertNotNil(DateComponents(argument: "on monday at 9pm"))
+        try assertUpcoming("next monday", weekday: 2)
+        try assertUpcoming("on monday at 9pm", weekday: 2, hour: 21)
     }
 
     func testIgnoreRandomString() {
