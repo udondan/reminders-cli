@@ -24,16 +24,6 @@ jobs:
         with:
           token: ${{ secrets.OVERRIDE_TOKEN }}
 
-      - name: Auto-merge release PR
-        if: steps.release.outputs.prs_created == 'true'
-        run: |
-          echo "${PRS}" | jq -r '.[].number' | while read -r pr; do
-            gh pr merge "$pr" --squash --auto --repo "${GITHUB_REPOSITORY}"
-          done
-        env:
-          GH_TOKEN: ${{ secrets.OVERRIDE_TOKEN }}
-          PRS: ${{ steps.release.outputs.prs }}
-
   # release-please creates the GitHub release as a draft (see
   # release-please-config.json). Releases in this repository are immutable
   # once published, so the tarball has to be attached while the release is
