@@ -123,7 +123,7 @@ extension PrettyRow {
             isCompleted: reminder.isCompleted,
             completionDate: reminder.completionDate,
             dueDate: reminder.dueDateComponents?.date,
-            dueIsDateOnly: reminder.dueDateComponents.map { $0.hour == nil } ?? false,
+            dueIsDateOnly: reminder.dueDateComponents.map(isDateOnly) ?? false,
             priority: Priority(reminder.mappedPriority),
             recurrence: reminder.recurrenceRules?.first.map { ($0.frequency, $0.interval) },
             isFlagged: reminder.isFlagged,

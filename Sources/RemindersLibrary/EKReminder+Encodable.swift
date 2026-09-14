@@ -11,10 +11,13 @@ extension EKReminder: @retroactive Encodable {
         case location
         case locationTitle
         case completionDate
+        case completionDateLocal
         case isCompleted
         case priority
         case startDate
         case dueDate
+        case dueDateLocal
+        case isAllDay
         case list
         case listId
         case recurrence
@@ -25,6 +28,7 @@ extension EKReminder: @retroactive Encodable {
         case hasRecurrence
         case isFlagged
         case nextDueDate
+        case nextDueDateLocal
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -44,6 +48,7 @@ extension EKReminder: @retroactive Encodable {
         // https://developer.apple.com/forums/thread/128140
         try container.encodeIfPresent(self.url, forKey: .url)
         try container.encode(format(self.completionDate), forKey: .completionDate)
+        try container.encode(localISO8601(self.completionDate), forKey: .completionDateLocal)
 
         for alarm in self.alarms ?? [] {
             if let location = alarm.structuredLocation {
@@ -62,6 +67,8 @@ extension EKReminder: @retroactive Encodable {
 
         if let dueDateComponents = self.dueDateComponents {
             try container.encodeIfPresent(format(dueDateComponents.date), forKey: .dueDate)
+            try container.encodeIfPresent(localISO8601(dueDateComponents.date), forKey: .dueDateLocal)
+            try container.encode(isDateOnly(dueDateComponents), forKey: .isAllDay)
         }
         
         if let lastModifiedDate = self.lastModifiedDate {
@@ -85,7 +92,9 @@ extension EKReminder: @retroactive Encodable {
             if let count = rule.recurrenceEnd?.occurrenceCount, count > 0 {
                 try container.encode(count, forKey: .recurrenceCount)
             }
-            try container.encodeIfPresent(format(nextDueDate(from: self)), forKey: .nextDueDate)
+            let next = nextDueDate(from: self)
+            try container.encodeIfPresent(format(next), forKey: .nextDueDate)
+            try container.encodeIfPresent(localISO8601(next), forKey: .nextDueDateLocal)
         }
     }
 
@@ -106,4 +115,21 @@ extension EKReminder: @retroactive Encodable {
             return date?.description(with: .current)
         }
     }
+}
+
+/// ISO 8601 with the offset of `timeZone` (the machine's by default), e.g.
+/// `2026-09-15T00:00:00+02:00`, backing the `...Local` JSON fields. A zero offset is written `Z`.
+func localISO8601(_ date: Date?, timeZone: TimeZone = .current) -> String? {
+    guard let date else {
+        return nil
+    }
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime]
+    formatter.timeZone = timeZone
+    return formatter.string(from: date)
+}
+
+/// Whether due date components carry only a day and no time, i.e. an all-day reminder.
+func isDateOnly(_ components: DateComponents) -> Bool {
+    return components.hour == nil
 }
