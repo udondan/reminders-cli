@@ -260,6 +260,36 @@ final class PrettyOutputTests: XCTestCase {
             format(reminder, id: id, listName: "Soon"),
             "Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (Remember the changelog) (priority: high) (repeats: weekly, interval: 2)")
     }
+
+    private func plainReminder(_ title: String) -> EKReminder {
+        let reminder = EKReminder(eventStore: EKEventStore())
+        reminder.title = title
+        return reminder
+    }
+
+    func testPlainOutputOfWeeklyDaysAndEndDate() throws {
+        let reminder = plainReminder("Standup")
+        // The end date is printed as a local day, so it's built in the local calendar.
+        let until = try XCTUnwrap(
+            recurrenceEndDate(from: DateComponents(calendar: .current, year: 2026, month: 12, day: 31)))
+        reminder.addRecurrenceRule(
+            Recurrence.weekly.recurrenceRule(
+                interval: 1, end: EKRecurrenceEnd(end: until), days: try RepeatDays(parsing: "wed,mon")))
+        XCTAssertEqual(format(reminder, id: "1"), "1: Standup (repeats: weekly on Mon, Wed, until: 2026-12-31)")
+    }
+
+    func testPlainOutputOfOccurrenceCount() {
+        let reminder = plainReminder("Medicine")
+        reminder.addRecurrenceRule(
+            Recurrence.daily.recurrenceRule(interval: 3, end: EKRecurrenceEnd(occurrenceCount: 10)))
+        XCTAssertEqual(format(reminder, id: "1"), "1: Medicine (repeats: daily, interval: 3, count: 10)")
+    }
+
+    func testPlainOutputOmitsEmptyNotes() {
+        let reminder = plainReminder("Read a book")
+        reminder.notes = ""
+        XCTAssertEqual(format(reminder, id: "1"), "1: Read a book")
+    }
 }
 
 final class ListingFormatTests: XCTestCase {
@@ -280,7 +310,9 @@ final class ListingFormatTests: XCTestCase {
 
     func testInvalidEnvironmentValueIsRejected() {
         XCTAssertThrowsError(try ListingFormat.resolve(explicit: nil, environment: ["REMINDERS_FORMAT": "yaml"])) {
-            XCTAssertTrue($0 is ValidationError)
+            XCTAssertEqual(
+                ($0 as? ValidationError)?.message,
+                "REMINDERS_FORMAT must be one of 'plain', 'json' or 'pretty', got 'yaml'")
         }
     }
 
@@ -294,8 +326,8 @@ final class ListingFormatTests: XCTestCase {
 
     func testVerboseRequiresPretty() {
         let list = UUID().uuidString
-        XCTAssertThrowsError(try CLI.parseAsRoot(["show", list, "--verbose"]))
-        XCTAssertThrowsError(try CLI.parseAsRoot(["show-all", "--format", "json", "-v"]))
+        assertParseError(["show", list, "--verbose"], contains: "--verbose requires --format pretty")
+        assertParseError(["show-all", "--format", "json", "-v"], contains: "--verbose requires --format pretty")
         XCTAssertNoThrow(try CLI.parseAsRoot(["show", list, "--format", "pretty", "--verbose"]))
         XCTAssertNoThrow(try CLI.parseAsRoot(["today", "-f", "pretty", "-v"]))
     }
@@ -304,8 +336,8 @@ final class ListingFormatTests: XCTestCase {
         for command in [["show", "x"], ["show-all"], ["today"], ["overdue"], ["upcoming"]] {
             XCTAssertNoThrow(try CLI.parseAsRoot(command + ["--format", "pretty"]), "\(command)")
         }
-        XCTAssertThrowsError(try CLI.parseAsRoot(["add", "x", "y", "--format", "pretty"]))
-        XCTAssertThrowsError(try CLI.parseAsRoot(["show-lists", "--format", "pretty"]))
+        assertParseError(["add", "x", "y", "--format", "pretty"], contains: "The value 'pretty' is invalid for '--format <format>'")
+        assertParseError(["show-lists", "--format", "pretty"], contains: "The value 'pretty' is invalid for '--format <format>'")
     }
 
     func testListingCommandsReportErrorsInResolvedFormat() throws {
