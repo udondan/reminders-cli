@@ -37,9 +37,17 @@ private struct ShowLists: FormattedCommand {
     }
 }
 
+private let nextDueDateDiscussion = """
+    In JSON output, a repeating reminder's nextDueDate is its first occurrence at or after now, \
+    counted from dueDate in steps of the repeat rule; missed occurrences of an overdue reminder are \
+    skipped. It is the date completing the reminder moves it to. EventKit never advances dueDate \
+    itself. Omitted for completed reminders and for repeat rules this CLI can't compute.
+    """
+
 private struct ShowAll: FormattedCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Print all reminders")
+        abstract: "Print all reminders",
+        discussion: nextDueDateDiscussion)
 
     @Flag(help: "Show completed items only")
     var onlyCompleted = false
@@ -246,7 +254,8 @@ private struct Upcoming: FormattedCommand {
 
 private struct Show: FormattedCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Print the items on the given list")
+        abstract: "Print the items on the given list",
+        discussion: nextDueDateDiscussion)
 
     @Argument(
         help: "The list to print items from: a name, a unique part of a name, or an ID from 'show-lists'",
