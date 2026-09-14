@@ -458,16 +458,20 @@ private struct Complete: FormattedCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to complete, or a unique prefix of at least 4 characters, see 'show' for IDs")
-    var id: String
+        help: "The ids of the reminders to complete, or unique prefixes of at least 4 characters, see 'show' for IDs; \(batchIdsHelp)")
+    var ids: [String] = []
 
     @Option(
         name: .shortAndLong,
         help: "Output format (plain or json)")
     var format: OutputFormat = .plain
 
+    func validate() throws {
+        try requireIds(ids)
+    }
+
     func run() throws {
-        try reminders.setComplete(true, itemAtId: self.id,
+        try reminders.setComplete(true, items: ReminderSelection(arguments: self.ids),
                             onListNamedOrId: self.listNameOrId,
                             outputFormat: format)
     }
@@ -483,16 +487,20 @@ private struct Uncomplete: FormattedCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to uncomplete, or a unique prefix of at least 4 characters, see 'show' for IDs")
-    var id: String
+        help: "The ids of the reminders to uncomplete, or unique prefixes of at least 4 characters, see 'show' for IDs; \(batchIdsHelp)")
+    var ids: [String] = []
 
     @Option(
         name: .shortAndLong,
         help: "Output format (plain or json)")
     var format: OutputFormat = .plain
 
+    func validate() throws {
+        try requireIds(ids)
+    }
+
     func run() throws {
-        try reminders.setComplete(false, itemAtId: self.id,
+        try reminders.setComplete(false, items: ReminderSelection(arguments: self.ids),
                             onListNamedOrId: self.listNameOrId,
                             outputFormat: format)
     }
@@ -508,16 +516,31 @@ private struct Delete: FormattedCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to delete, or a unique prefix of at least 4 characters, see 'show' for IDs")
-    var id: String
+        help: "The ids of the reminders to delete, or unique prefixes of at least 4 characters, see 'show' for IDs; \(batchIdsHelp)")
+    var ids: [String] = []
 
     @Option(
         name: .shortAndLong,
         help: "Output format (plain or json)")
     var format: OutputFormat = .plain
 
+    func validate() throws {
+        try requireIds(ids)
+    }
+
     func run() throws {
-        try reminders.delete(itemAtId: self.id, onListNamedOrId: self.listNameOrId, outputFormat: format)
+        try reminders.delete(
+            items: ReminderSelection(arguments: self.ids), onListNamedOrId: self.listNameOrId, outputFormat: format)
+    }
+}
+
+/// How every mutating command's ID argument can name several reminders; see `ReminderSelection`.
+private let batchIdsHelp =
+    "several IDs can be given comma-separated, and '-' reads newline-separated IDs from standard input"
+
+private func requireIds(_ ids: [String]) throws {
+    if ids.isEmpty {
+        throw ValidationError("Missing expected argument '<ids> ...'")
     }
 }
 
@@ -537,7 +560,7 @@ private struct Edit: FormattedCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to edit, or a unique prefix of at least 4 characters, see 'show' for IDs")
+        help: "The id of the reminder to edit, or a unique prefix of at least 4 characters, see 'show' for IDs; \(batchIdsHelp)")
     var id: String
 
     @Option(
@@ -617,6 +640,9 @@ private struct Edit: FormattedCommand {
     var format: OutputFormat = .plain
 
     func validate() throws {
+        if !self.reminder.isEmpty && ReminderSelection.isBatch(arguments: [self.id]) {
+            throw ValidationError("New reminder text can only be set on one reminder at a time")
+        }
         if self.dueDate != nil && self.clearDueDate {
             throw ValidationError("Cannot specify both --due-date and --clear-due-date")
         }
@@ -668,7 +694,7 @@ private struct Edit: FormattedCommand {
     func run() throws {
         let newText = self.reminder.joined(separator: " ")
         try reminders.edit(
-            itemAtId: self.id,
+            items: ReminderSelection(arguments: [self.id]),
             onListNamedOrId: self.listNameOrId,
             newText: newText.isEmpty ? nil : newText,
             newNotes: self.notes,
@@ -700,7 +726,7 @@ private struct Postpone: FormattedCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to postpone, or a unique prefix of at least 4 characters, see 'show' for IDs")
+        help: "The id of the reminder to postpone, or a unique prefix of at least 4 characters, see 'show' for IDs; \(batchIdsHelp)")
     var id: String
 
     @Argument(
@@ -728,7 +754,7 @@ private struct Postpone: FormattedCommand {
 
     func run() throws {
         try reminders.postpone(
-            itemAtId: self.id,
+            items: ReminderSelection(arguments: [self.id]),
             onListNamedOrId: self.listNameOrId,
             to: self.date,
             toNextWeekday: self.nextWeekday,

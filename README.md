@@ -150,6 +150,34 @@ affected reminder as JSON instead of the plain-text confirmation shown above, `n
 --format json` prints the created list, and `delete-list --format json` prints the deleted list.
 Errors are never printed to stdout; see [Errors](#errors).
 
+### Act on several reminders at once
+
+`complete`, `uncomplete` and `delete` take any number of IDs (or prefixes), as separate arguments or
+comma-separated. `edit` and `postpone` take a comma-separated list in their single ID argument. In
+every one of them, `-` reads newline-separated IDs from standard input:
+
+```console
+$ reminders complete Soon 2A29 44C1
+Completed 'Write README'
+Completed 'Ship reminders-cli'
+
+$ reminders edit Soon 2A29,44C1 --priority high
+Updated reminder 'Write README'
+Updated reminder 'Ship reminders-cli'
+
+$ reminders overdue --list Soon --format json | jq -r '.[].externalId' | reminders postpone Soon - today
+Postponed reminder 'Water the plants'
+Postponed reminder 'Call the bank'
+```
+
+Every ID is looked up before anything is changed. If one of them is missing or ambiguous, or can't
+be changed (such as `postpone --next-weekday` on a reminder without a due date), the command fails
+with that error and leaves all of them untouched. Naming the same reminder twice acts on it once.
+Plain output prints one confirmation line per reminder. With `--format json`, a single ID still
+prints one object, while several IDs, a comma-separated list, or `-` always print an array, even
+when standard input holds only one ID. New reminder text (`edit <list> <id> <text>`) can only be set
+on one reminder at a time.
+
 ### Undo a completed item
 
 ```console

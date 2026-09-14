@@ -234,4 +234,52 @@ final class IdentifierTests: XCTestCase {
         let titles = ["Buy milk", "Buy eggs", "Ship it", "Short"]
         XCTAssertEqual(try resolveIdentifier(ids, titles: titles, idOrPrefix: "2a29", onList: "List"), 2)
     }
+
+    // MARK: - Batch resolution
+
+    func testResolveIdentifiersKeepsArgumentOrder() throws {
+        let titles = ["Buy milk", "Buy eggs", "Ship it", "Short"]
+        XCTAssertEqual(
+            try resolveIdentifiers(ids, titles: titles, idsOrPrefixes: ["ab", "2a29", "44C111"], onList: "List"),
+            [3, 2, 0])
+    }
+
+    func testResolveIdentifiersCollapsesArgumentsNamingTheSameReminder() throws {
+        let titles = ["Buy milk", "Buy eggs", "Ship it", "Short"]
+        XCTAssertEqual(
+            try resolveIdentifiers(
+                ids, titles: titles,
+                idsOrPrefixes: ["2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C", "ab", "2a29"], onList: "List"),
+            [2, 3])
+    }
+
+    func testResolveIdentifiersFailsWhenAnyIdIsMissing() throws {
+        let titles = ["Buy milk", "Buy eggs", "Ship it", "Short"]
+        XCTAssertThrowsError(
+            try resolveIdentifiers(ids, titles: titles, idsOrPrefixes: ["2a29", "FFFFFFFF", "ab"], onList: "List")
+        ) { error in
+            XCTAssertEqual(error as? CLIError, .reminderNotFound(id: "FFFFFFFF", listNameOrId: "List"))
+        }
+    }
+
+    func testResolveIdentifiersFailsWhenAnyIdIsAmbiguous() throws {
+        let titles = ["Buy milk", "Buy eggs", "Ship it", "Short"]
+        XCTAssertThrowsError(
+            try resolveIdentifiers(ids, titles: titles, idsOrPrefixes: ["2a29", "44c1"], onList: "List")
+        ) { error in
+            XCTAssertEqual((error as? CLIError)?.code, .reminderAmbiguous)
+        }
+    }
+
+    func testResolveRemindersReturnsEveryNamedReminder() throws {
+        let calendar = makeCalendar(title: "List")
+        let first = makeReminder(title: "First", calendar: calendar)
+        let second = makeReminder(title: "Second", calendar: calendar)
+        let third = makeReminder(title: "Third", calendar: calendar)
+        let resolved = try resolveReminders(
+            [first, second, third],
+            idsOrPrefixes: [third.calendarItemExternalIdentifier, first.calendarItemExternalIdentifier],
+            onList: "List")
+        XCTAssertEqual(resolved.map(\.title), ["Third", "First"])
+    }
 }
