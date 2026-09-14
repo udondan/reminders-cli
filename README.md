@@ -8,15 +8,55 @@ A simple CLI for interacting with OS X reminders.
 
 ```console
 $ reminders show-lists
-Soon (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)
-Eventually (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)
+Soon        (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)   12 open, 3 overdue
+Eventually  (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)    4 open
+Someday     (9F0A1B2C-3D4E-5F60-7182-93A4B5C6D7E8)    0 open
+```
+
+"Open" counts the reminders that are not completed; "overdue" counts those among them whose due date
+has passed, the same definition `show --overdue` uses, and it is only shown when it is not zero.
+
+Completed reminders are not counted by default, because fetching them is noticeably slower on a
+store that has been in use for a while. Ask for them explicitly:
+
+```console
+$ reminders show-lists --include-completed
+Soon        (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)   12 open, 3 overdue, 214 completed
+Eventually  (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)    4 open, 8 completed
+Someday     (9F0A1B2C-3D4E-5F60-7182-93A4B5C6D7E8)    0 open, 0 completed
+```
+
+Lists are printed in the order Reminders.app keeps them. `--sort`/`-s` reorders them by `name`
+(case-insensitive), `open` or `overdue`. The two count orders put the busiest list first and break
+ties by name:
+
+```console
+$ reminders show-lists --sort name
+Eventually  (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)    4 open
+Someday     (9F0A1B2C-3D4E-5F60-7182-93A4B5C6D7E8)    0 open
+Soon        (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)   12 open, 3 overdue
+```
+
+With `--format json` the counts are `openCount`, `overdueCount` and, with `--include-completed`,
+`completedCount`:
+
+```console
+$ reminders show-lists --format json
+[
+  {
+    "calendarIdentifier" : "2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C",
+    "openCount" : 12,
+    "overdueCount" : 3,
+    "title" : "Soon"
+  }
+]
 ```
 
 Show only the default list (the one Reminders.app adds new reminders to):
 
 ```console
 $ reminders show-lists --default-only
-Soon (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)
+Soon  (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)   12 open, 3 overdue
 ```
 
 Every list also has a stable identifier, shown above in parentheses (and available as
@@ -33,8 +73,8 @@ that matches several lists is an error, never a guess:
 
 ```console
 $ reminders show-lists
-Work (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)
-Work – Side projects (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)
+Work                  (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)   12 open, 3 overdue
+Work – Side projects  (7E1F2A3B-4C5D-6E7F-8A9B-0C1D2E3F4A5B)    4 open
 $ reminders show wor
 Error: Multiple reminders lists match 'wor': Work, Work – Side projects
 Suggestion: Be more specific, or pass the list's ID from 'reminders show-lists'
