@@ -54,4 +54,12 @@ final class CLIRunTests: XCTestCase {
             XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
         }
     }
+
+    /// Only the parse failure is exercised: a valid `show-lists` would print the machine's real
+    /// lists on a developer machine that has granted the test runner access.
+    func testShowListsRejectsUnknownSort() {
+        XCTAssertThrowsError(try CLI.runCommand(["show-lists", "--sort", "bogus"])) { error in
+            XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
+        }
+    }
 }

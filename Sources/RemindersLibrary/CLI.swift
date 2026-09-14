@@ -11,7 +11,7 @@ protocol FormattedCommand: ParsableCommand {
 
 private struct ShowLists: FormattedCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Print the name of lists to pass to other commands")
+        abstract: "Print the lists to pass to other commands, with open and overdue reminder counts")
     @Option(
         name: .shortAndLong,
         help: "format, either of 'plain' or 'json'")
@@ -22,8 +22,18 @@ private struct ShowLists: FormattedCommand {
         help: "show only the default Reminders list")
     var defaultOnly: Bool = false
 
+    @Flag(help: "Also count completed reminders per list (slower on large lists)")
+    var includeCompleted = false
+
+    @Option(
+        name: .shortAndLong,
+        help: "Show the lists in a specific order, one of: \(ListSort.commaSeparatedCases)")
+    var sort: ListSort = .none
+
     func run() throws {
-        try reminders.showLists(outputFormat: format, defaultOnly: defaultOnly)
+        try reminders.showLists(
+            outputFormat: format, defaultOnly: defaultOnly, includeCompleted: includeCompleted,
+            sort: sort)
     }
 }
 

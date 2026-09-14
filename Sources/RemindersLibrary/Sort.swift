@@ -59,3 +59,36 @@ public enum CustomSortOrder: String, Decodable, ExpressibleByArgument, CaseItera
 
     public static let commaSeparatedCases = Self.allCases.map { $0.rawValue }.joined(separator: ", ")
 }
+
+/// Ordering for `show-lists`. `none` keeps EventKit's order, `name` sorts case-insensitively
+/// ascending, and the count orders sort descending so the busiest list comes first, with the name
+/// as the tie-breaker. There is deliberately no `--sort-order` for lists: "fewest open first" is
+/// not a useful view.
+enum ListSort: String, ExpressibleByArgument, CaseIterable {
+    case none
+    case name
+    case open
+    case overdue
+
+    static let commaSeparatedCases = Self.allCases.map { $0.rawValue }.joined(separator: ", ")
+
+    func apply(to summaries: [ListSummary]) -> [ListSummary] {
+        switch self {
+            case .none: return summaries
+            case .name: return summaries.sorted(by: nameAscending)
+            case .open: return summaries.sorted { descending($0.openCount, $1.openCount, thenBy: $0, $1) }
+            case .overdue: return summaries.sorted { descending($0.overdueCount, $1.overdueCount, thenBy: $0, $1) }
+        }
+    }
+}
+
+private func nameAscending(_ a: ListSummary, _ b: ListSummary) -> Bool {
+    return a.title.localizedCaseInsensitiveCompare(b.title) == .orderedAscending
+}
+
+private func descending(_ countA: Int, _ countB: Int, thenBy a: ListSummary, _ b: ListSummary) -> Bool {
+    if countA != countB {
+        return countA > countB
+    }
+    return nameAscending(a, b)
+}

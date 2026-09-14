@@ -27,7 +27,7 @@ allowed-tools: Bash(reminders:*)
 
 | Command | Arguments and options |
 | --- | --- |
-| `reminders show-lists` | `--default-only`/`-d` (only the list Reminders.app adds to by default) |
+| `reminders show-lists` | Lists with their open and overdue reminder counts. `--default-only`/`-d` (only the list Reminders.app adds to by default), `--include-completed` (also count completed reminders, slower), `--sort`/`-s <none\|name\|open\|overdue>` |
 | `reminders show <list>` | Reminders on one list. Filters: `--only-completed`, `--include-completed`, `--include-overdue` (with `--due-date`, also include items due before that date), `--due-date`/`-d <date>`, `--overdue`, `--due-before <date>`, `--due-after <date>`, `--no-due-date`, `--priority <none\|low\|medium\|high>` (repeatable), `--search <text>` (case-insensitive, matches title or notes), `--completed-since <date>`. Sorting: `--sort`/`-s <none\|creation-date\|due-date\|priority>`, `--sort-order`/`-o <ascending\|descending>` |
 | `reminders show-all` | Reminders across all lists. Same filters and sorting as `show`, plus `--list <list>` (repeatable) to restrict to some lists |
 | `reminders add <list> <text...>` | `--due-date`/`-d <date>`, `--priority`/`-p <none\|low\|medium\|high>`, `--notes`/`-n <text>`, `--repeat <daily\|weekly\|monthly\|yearly>`, `--repeat-interval <n>`, `--repeat-until <date>` |
@@ -47,6 +47,7 @@ Constraints enforced by the CLI (violations are usage errors, exit status 64):
 - `edit`: at least one change is required. `--due-date`/`--clear-due-date`, `--priority`/`--clear-priority` and `--notes`/`--clear-notes` are pairwise exclusive. `--clear-repeat` cannot be combined with other repeat options. Changing only the interval or end keeps the existing frequency. Changing the frequency resets the interval to 1 unless `--repeat-interval` is given.
 - `postpone`: exactly one of `date` or `--next-weekday`.
 - `--sort priority` orders high, medium, low, then none, with due date ascending as the tiebreaker. `--sort due-date` always puts reminders without a due date last.
+- `show-lists --sort name` is ascending and case-insensitive; `--sort open` and `--sort overdue` are descending (busiest list first) with the name as the tiebreaker. `show-lists` has no `--sort-order`.
 
 ## JSON fields of a reminder
 
@@ -78,7 +79,7 @@ All dates are ISO 8601 strings in UTC (for example `2026-09-14T07:00:00Z`). Fiel
 | `nextDueDate` | string | optional | Next actionable occurrence of a repeating reminder, computed by the CLI. Only present when `hasRecurrence` is true and the rule is a plain daily/weekly/monthly/yearly (+ interval) rule. |
 <!-- json-fields:end -->
 
-`show-lists --format json` and `new-list --format json` return list objects with `title` and `calendarIdentifier`.
+`show-lists --format json` returns list objects with `title`, `calendarIdentifier`, `openCount` (reminders that are not completed) and `overdueCount` (of those, the ones whose due date has passed — the same definition as `show --overdue`). `completedCount` is present only with `--include-completed`. `new-list --format json` returns a list object with `title` and `calendarIdentifier` only.
 
 ## Errors
 

@@ -78,6 +78,13 @@ private func format(_ reminder: EKReminder, id: String, listName: String? = nil)
     return "\(listString)\(id): \(reminder.title ?? "<unknown>")\(notesString)\(dateString)\(priorityString)\(recurrenceString)"
 }
 
+/// The one definition of "overdue" in the CLI, shared by `show --overdue` and the counts of
+/// `show-lists` so the two views never disagree: a due date strictly before `now`, which the caller
+/// resolves once per command invocation. A reminder without a due date is never overdue.
+func isOverdue(_ reminder: EKReminder, now: Date) -> Bool {
+    return reminder.dueDateComponents?.date.map { $0 < now } ?? false
+}
+
 // Additional, independently-composable filters for `show`/`show-all`, ANDed together and ANDed
 // with the pre-existing day-granularity `--due-date`/`--include-overdue` filter. `now`,
 // `dueBefore`, `dueAfter`, and `completedSince` are resolved to concrete `Date`s once per command
@@ -100,7 +107,7 @@ func matchesAdditionalFilters(
     if noDueDate && reminderDueDate != nil {
         return false
     }
-    if overdue && !(reminderDueDate.map { $0 < now } ?? false) {
+    if overdue && !isOverdue(reminder, now: now) {
         return false
     }
     if let dueBefore, !(reminderDueDate.map { $0 <= dueBefore } ?? false) {
@@ -619,7 +626,10 @@ public final class Reminders {
         return Store.defaultCalendarForNewReminders()
     }
 
-    func showLists(outputFormat: OutputFormat, defaultOnly: Bool = false) throws {
+    func showLists(
+        outputFormat: OutputFormat, defaultOnly: Bool = false, includeCompleted: Bool = false,
+        sort: ListSort = .none
+    ) throws {
         let calendars: [EKCalendar]
         if defaultOnly {
             guard let defaultCalendar = self.getDefaultList() else {
@@ -629,12 +639,30 @@ public final class Reminders {
         } else {
             calendars = self.getCalendars()
         }
-        switch (outputFormat) {
+        let now = Date()
+        // One fetch across every list, bucketed afterwards, rather than one fetch per list.
+        // Completed reminders are only fetched on request: they dominate a store that has been in
+        // use for a while and make the fetch noticeably slower.
+        let reminders: [EKReminder]
+        if calendars.isEmpty {
+            reminders = []
+        } else if includeCompleted {
+            reminders = self.fetchReminders(on: calendars, displayOptions: .all)
+        } else {
+            reminders = self.fetchReminders(
+                matching: Store.predicateForIncompleteReminders(
+                    withDueDateStarting: nil, ending: nil, calendars: calendars),
+                displayOptions: .incomplete)
+        }
+        let summaries = sort.apply(
+            to: summarizeLists(
+                calendars, reminders: reminders, now: now, includeCompleted: includeCompleted))
+        switch outputFormat {
         case .json:
-            print(encodeToJson(data: calendars))
-        default:
-            for calendar in calendars {
-                print("\(calendar.title) (\(calendar.calendarIdentifier))")
+            print(encodeToJson(data: summaries))
+        case .plain:
+            for line in formatListSummaries(summaries) {
+                print(line)
             }
         }
     }
@@ -1055,13 +1083,19 @@ public final class Reminders {
 
     // MARK: - Private functions
 
+    /// Every reminder on `calendars`. `show-lists` uses the predicate-taking overload below
+    /// instead, to fetch only the incomplete ones.
+    private func fetchReminders(on calendars: [EKCalendar], displayOptions: DisplayOptions) -> [EKReminder] {
+        return self.fetchReminders(
+            matching: Store.predicateForReminders(in: calendars), displayOptions: displayOptions)
+    }
+
     /// EventKit only offers a callback-based fetch; block on it once here so every command
     /// can be written as straight-line code that simply throws on failure (nothing can be
     /// thrown from inside EventKit's completion closure).
-    private func fetchReminders(on calendars: [EKCalendar], displayOptions: DisplayOptions) -> [EKReminder] {
+    private func fetchReminders(matching predicate: NSPredicate, displayOptions: DisplayOptions) -> [EKReminder] {
         let semaphore = DispatchSemaphore(value: 0)
         var fetched: [EKReminder] = []
-        let predicate = Store.predicateForReminders(in: calendars)
         Store.fetchReminders(matching: predicate) { reminders in
             fetched = reminders?
                 .filter { self.shouldDisplay(reminder: $0, displayOptions: displayOptions) } ?? []

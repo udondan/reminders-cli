@@ -71,6 +71,16 @@ final class FilterTests: XCTestCase {
         XCTAssertFalse(matches(makeReminder(), now: now, overdue: true))
     }
 
+    /// `show-lists` counts overdue reminders through the same predicate as `--overdue`, so pin
+    /// its boundary here: strictly before `now`, never for a reminder without a due date.
+    func testIsOverdueIsStrictlyBeforeNow() throws {
+        let now = wholeSecond()
+        XCTAssertTrue(isOverdue(makeReminder(due: now.addingTimeInterval(-1)), now: now))
+        XCTAssertFalse(isOverdue(makeReminder(due: now), now: now))
+        XCTAssertFalse(isOverdue(makeReminder(due: now.addingTimeInterval(1)), now: now))
+        XCTAssertFalse(isOverdue(makeReminder(), now: now))
+    }
+
     func testDueBeforeIncludesExactBoundary() throws {
         let cutoff = wholeSecond()
         let reminder = makeReminder(due: cutoff)
