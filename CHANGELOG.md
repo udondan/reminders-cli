@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.5.0](https://github.com/udondan/reminders-cli/compare/v3.4.0...v3.5.0) (2026-09-14)
+
+
+### Features
+
+* accept multiple reminder IDs in complete, uncomplete, postpone, delete and edit ([#75](https://github.com/udondan/reminders-cli/issues/75)) ([bfa08f2](https://github.com/udondan/reminders-cli/commit/bfa08f2119405b228ab4912d1fdbe7f9187d5cb1)), closes [#72](https://github.com/udondan/reminders-cli/issues/72)
+* add local-time dates and isAllDay to JSON output ([#79](https://github.com/udondan/reminders-cli/issues/79)) ([1f06100](https://github.com/udondan/reminders-cli/commit/1f061009ddd9b8606885850b4f5d0d77669f19b7)), closes [#74](https://github.com/udondan/reminders-cli/issues/74)
+
+
+### Bug Fixes
+
+* don't request Reminders access for the help subcommand ([550f7b6](https://github.com/udondan/reminders-cli/commit/550f7b66a6b43f6803f9e90ac6d95e9220f81e9e))
+* name the existing --include-completed flag in the show and show-all conflict error ([550f7b6](https://github.com/udondan/reminders-cli/commit/550f7b66a6b43f6803f9e90ac6d95e9220f81e9e))
+
 ## [3.4.0](https://github.com/udondan/reminders-cli/compare/v3.3.0...v3.4.0) (2026-09-14)
 
 
