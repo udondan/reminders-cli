@@ -231,6 +231,27 @@ final class RecurrenceTests: XCTestCase {
         XCTAssertNotNil(object["nextDueDate"] as? String)
     }
 
+    func testNewRecurrenceRuleIsNilWithoutRecurrence() throws {
+        XCTAssertNil(try newRecurrenceRule(nil, interval: 1, endDate: nil))
+    }
+
+    func testNewRecurrenceRuleUsesFrequencyIntervalAndEnd() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Belgrade"))
+        var until = DateComponents()
+        until.calendar = calendar
+        until.timeZone = calendar.timeZone
+        until.year = 2027
+        until.month = 9
+        until.day = 1
+
+        let rule = try XCTUnwrap(newRecurrenceRule(.weekly, interval: 2, endDate: until))
+        XCTAssertEqual(rule.frequency, .weekly)
+        XCTAssertEqual(rule.interval, 2)
+        let endDate = try XCTUnwrap(rule.recurrenceEnd?.endDate)
+        XCTAssertEqual(endDate, recurrenceEndDate(from: until))
+    }
+
     func testAddRejectsExplicitIntervalWithoutRecurrence() throws {
         XCTAssertThrowsError(
             try CLI.parseAsRoot([

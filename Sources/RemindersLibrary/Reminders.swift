@@ -443,6 +443,18 @@ private func recurrenceEnd(dateComponents: DateComponents?) throws -> EKRecurren
     return EKRecurrenceEnd(end: date)
 }
 
+/// The repeat rule `add` attaches to a new reminder, or nil when `--repeat` wasn't given. Kept free
+/// of the event store so it's unit-testable, since `addReminder` itself needs Reminders access.
+func newRecurrenceRule(
+    _ recurrence: Recurrence?, interval: Int, endDate: DateComponents?
+) throws -> EKRecurrenceRule? {
+    guard let recurrence else {
+        return nil
+    }
+    return recurrence.recurrenceRule(
+        interval: interval, end: try recurrenceEnd(dateComponents: endDate))
+}
+
 func validateRecurrenceEnd(
     dueDateComponents: DateComponents?,
     rules: [EKRecurrenceRule]
@@ -1087,6 +1099,19 @@ public final class Reminders {
             if let absoluteDate = dueDate.date {
                 reminder.addAlarm(EKAlarm(absoluteDate: absoluteDate))
             }
+        }
+
+        do {
+            if let rule = try newRecurrenceRule(
+                recurrence, interval: recurrenceInterval, endDate: recurrenceEndDate)
+            {
+                reminder.addRecurrenceRule(rule)
+            }
+            try validateRecurrenceSchedule(
+                dueDateComponents: reminder.dueDateComponents,
+                rules: reminder.recurrenceRules ?? [])
+        } catch let error as RecurrenceUpdateError {
+            throw CLIError.invalidArgument(error.localizedDescription)
         }
 
         try self.save(reminder, action: "add reminder")
