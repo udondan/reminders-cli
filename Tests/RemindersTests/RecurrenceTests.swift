@@ -474,4 +474,21 @@ final class RecurrenceTests: XCTestCase {
 
         XCTAssertNil(nextDueDate(from: reminder))
     }
+
+    func testNextDueDateReturnsNilForCompletedReminder() throws {
+        let store = EKEventStore()
+        let reminder = EKReminder(eventStore: store)
+        let calendar = EKCalendar(for: .reminder, eventStore: store)
+        calendar.title = "Test"
+        reminder.calendar = calendar
+        reminder.title = "Last run"
+        reminder.dueDateComponents = Calendar.current.dateComponents(
+            [.year, .month, .day, .hour, .minute], from: Date(timeIntervalSince1970: 1_800_000_000))
+        reminder.addRecurrenceRule(Recurrence.daily.recurrenceRule(interval: 1, end: nil))
+        let referenceDate = Date(timeIntervalSince1970: 1_700_000_000)
+        XCTAssertNotNil(nextDueDate(from: reminder, referenceDate: referenceDate))
+
+        reminder.isCompleted = true
+        XCTAssertNil(nextDueDate(from: reminder, referenceDate: referenceDate))
+    }
 }

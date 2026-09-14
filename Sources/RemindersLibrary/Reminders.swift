@@ -554,8 +554,12 @@ func nextOccurrence(
     return isWithinBounds(occurrence, occurrenceNumber: occurrenceNumber) ? occurrence : nil
 }
 
+// Completing a repeating reminder moves it to its next occurrence and leaves a
+// completed copy without a rule behind. A completed reminder that still has a
+// rule is one whose repeat ran out, so it has no next due date.
 func nextDueDate(from reminder: EKReminder, referenceDate: Date = Date()) -> Date? {
-    guard let rule = reminder.recurrenceRules?.first,
+    guard !reminder.isCompleted,
+        let rule = reminder.recurrenceRules?.first,
         let anchor = reminder.dueDateComponents?.date
     else {
         return nil

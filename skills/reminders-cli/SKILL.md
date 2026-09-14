@@ -82,7 +82,7 @@ All dates are ISO 8601 strings in UTC (for example `2026-09-14T07:00:00Z`). Fiel
 | `recurrenceCount` | integer | optional | Number of occurrences. Only for count-ended rules (created by Reminders.app, not by this CLI). |
 | `hasRecurrence` | boolean | always | Whether a repeat rule is set. |
 | `isFlagged` | boolean | always | Whether the reminder is flagged. Read-only: no command can set or clear it. Reads `false` on macOS versions that don't expose the flag. |
-| `nextDueDate` | string | optional | Next actionable occurrence of a repeating reminder, computed by the CLI. Only present when `hasRecurrence` is true and the rule is a plain daily/weekly/monthly/yearly (+ interval) rule. |
+| `nextDueDate` | string | optional | Next actionable occurrence of a repeating reminder, computed by the CLI. Only present when `hasRecurrence` is true, `isCompleted` is false and the rule is a plain daily/weekly/monthly/yearly (+ interval) rule. |
 <!-- json-fields:end -->
 
 `show-lists --format json` returns list objects with `title`, `calendarIdentifier`, `openCount` (reminders that are not completed) and `overdueCount` (of those, the ones whose due date has passed — the same definition as `show --overdue`). `completedCount` is present only with `--include-completed`. `new-list --format json` returns a list object with `title` and `calendarIdentifier` only.
