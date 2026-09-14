@@ -150,6 +150,13 @@ affected reminder as JSON instead of the plain-text confirmation shown above, `n
 --format json` prints the created list, and `delete-list --format json` prints the deleted list.
 Errors are never printed to stdout; see [Errors](#errors).
 
+Dates in a reminder's JSON are UTC (`dueDate`, `startDate`, `nextDueDate`, `completionDate`,
+`creationDate`, `lastModified`). `dueDate`, `nextDueDate` and `completionDate` also come as
+`dueDateLocal`, `nextDueDateLocal` and `completionDateLocal`: the same instant in the machine's
+time zone with its offset, so a reminder due on Sept 15 with no time reads
+`"dueDate": "2026-09-14T22:00:00Z"` but `"dueDateLocal": "2026-09-15T00:00:00+02:00"` in CEST.
+`isAllDay` (present with a due date) tells a date-only reminder from one due at midnight.
+
 ### Act on several reminders at once
 
 `complete`, `uncomplete` and `delete` take any number of IDs (or prefixes), as separate arguments or

@@ -61,7 +61,7 @@ Constraints enforced by the CLI (violations are usage errors, exit status 64):
 
 ## JSON fields of a reminder
 
-All dates are ISO 8601 strings in UTC (for example `2026-09-14T07:00:00Z`). Fields marked optional are omitted from the object when they do not apply.
+All dates are ISO 8601 strings in UTC (for example `2026-09-14T07:00:00Z`). `completionDate`, `dueDate` and `nextDueDate` also have a `...Local` variant: the same instant in the machine's time zone with its offset (for example `2026-09-15T00:00:00+02:00`, or `Z` when the offset is zero). To group or compare by calendar day, use the date part of a `...Local` field rather than converting the UTC value yourself, and check `isAllDay` before reading a time of day. Fields marked optional are omitted from the object when they do not apply.
 
 <!-- json-fields:start -->
 | Field | Type | Present | Meaning |
@@ -75,10 +75,13 @@ All dates are ISO 8601 strings in UTC (for example `2026-09-14T07:00:00Z`). Fiel
 | `location` | string | optional | `"latitude, longitude"` of a location-based alarm. |
 | `locationTitle` | string | optional | Title of a location-based alarm. |
 | `completionDate` | string or null | always | Completion time, `null` while incomplete. |
+| `completionDateLocal` | string or null | always | `completionDate` in the machine's time zone with offset, `null` while incomplete. |
 | `isCompleted` | boolean | always | Whether the reminder is done. |
 | `priority` | integer | always | EventKit priority: `0` none, `1` high, `5` medium, `9` low. |
 | `startDate` | string | optional | Start date, if set. |
 | `dueDate` | string | optional | Due date. For repeating reminders this is the date last set, not the next occurrence (see below). |
+| `dueDateLocal` | string | optional | `dueDate` in the machine's time zone with offset. Present whenever `dueDate` is. |
+| `isAllDay` | boolean | optional | Whether the due date has no time of day (a date-only reminder, due at local midnight). Present whenever `dueDate` is. |
 | `list` | string | always | Name of the list containing the reminder. |
 | `listId` | string | always | `calendarIdentifier` of that list. |
 | `recurrence` | string | optional | `daily`, `weekly`, `monthly` or `yearly`. Only present when `hasRecurrence` is true. |
@@ -89,6 +92,7 @@ All dates are ISO 8601 strings in UTC (for example `2026-09-14T07:00:00Z`). Fiel
 | `hasRecurrence` | boolean | always | Whether a repeat rule is set. |
 | `isFlagged` | boolean | always | Whether the reminder is flagged. Read-only: no command can set or clear it. Reads `false` on macOS versions that don't expose the flag. |
 | `nextDueDate` | string | optional | Next actionable occurrence of a repeating reminder, computed by the CLI: the first occurrence at or after now, counted from `dueDate` (equals `dueDate` while that is still ahead). Only present when `hasRecurrence` is true, `isCompleted` is false and the rule is a plain daily/weekly/monthly/yearly (+ interval) rule or a weekly rule on `recurrenceDays`. |
+| `nextDueDateLocal` | string | optional | `nextDueDate` in the machine's time zone with offset. Present whenever `nextDueDate` is. |
 <!-- json-fields:end -->
 
 `show-lists --format json` returns list objects with `title`, `calendarIdentifier`, `openCount` (reminders that are not completed) and `overdueCount` (of those, the ones whose due date has passed — the same definition as `show --overdue`). `completedCount` is present only with `--include-completed`. `new-list --format json` returns a list object with `title` and `calendarIdentifier` only. `delete-list --confirm --format json` returns `{deleted: true, title, calendarIdentifier, reminderCount}`.
