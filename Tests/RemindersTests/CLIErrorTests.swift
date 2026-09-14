@@ -22,6 +22,8 @@ final class CLIErrorTests: XCTestCase {
         case .saveFailed: return .saveFailed(action: "add reminder", underlying: UnderlyingError())
         case .accessDenied: return .accessDenied(underlying: UnderlyingError())
         case .invalidArgument: return .invalidArgument("--repeat-until cannot be earlier than the due date")
+        case .confirmationRequired:
+            return .confirmationRequired(title: "Groceries", reminderCount: 14, completedCount: 3)
         }
     }
 

@@ -61,9 +61,9 @@ Soon  (2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C)   12 open, 3 overdue
 
 Every list also has a stable identifier, shown above in parentheses (and available as
 `calendarIdentifier` with `--format json`). Anywhere a list name is accepted — `show`, `show-all`,
-`add`, `complete`, `uncomplete`, `edit`, `postpone`, `delete` — a list ID works too, which is useful
-for scripting against a list whose name might change or contains characters that are awkward on the
-command line.
+`add`, `complete`, `uncomplete`, `edit`, `postpone`, `delete`, `delete-list` — a list ID works too,
+which is useful for scripting against a list whose name might change or contains characters that are
+awkward on the command line.
 
 For interactive use, the list argument doesn't have to be the exact name either. It's resolved by
 trying, in order: an exact ID, an exact name, a case-insensitive name, and finally a case-insensitive
@@ -82,7 +82,8 @@ Suggestion: Be more specific, or pass the list's ID from 'reminders show-lists'
 
 (`reminders show work` does resolve to `Work`, because the whole-name match is tried before the
 substring match.) `new-list` always creates exactly the name you give it; no fuzzy matching applies
-there.
+there. `delete-list` skips the substring step: it only accepts an ID or a whole name (case doesn't
+matter), see [Delete a list](#delete-a-list).
 
 ### Show reminders on a specific list
 
@@ -114,8 +115,9 @@ $ reminders show Soon
 ```
 
 `complete`, `uncomplete`, `edit`, `postpone`, and `delete` also accept `--format json` to print the
-affected reminder as JSON instead of the plain-text confirmation shown above, and `new-list
---format json` prints the created list. Errors are never printed to stdout; see [Errors](#errors).
+affected reminder as JSON instead of the plain-text confirmation shown above, `new-list
+--format json` prints the created list, and `delete-list --format json` prints the deleted list.
+Errors are never printed to stdout; see [Errors](#errors).
 
 ### Undo a completed item
 
@@ -229,6 +231,48 @@ $ reminders delete Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C --format json
   "title" : "Write README"
 }
 ```
+
+### Create a list
+
+```console
+$ reminders new-list Groceries
+Created new list 'Groceries'!
+```
+
+When lists live in several accounts (for example iCloud and Exchange), pick one with
+`--source iCloud`.
+
+### Delete a list
+
+Deleting a list deletes **every reminder on it**, completed or not. Without `--confirm`, nothing is
+deleted: `delete-list` says what would be removed and exits with status `13`
+(`confirmation_required`):
+
+```console
+$ reminders delete-list Groceries
+Error: 'Groceries' contains 14 reminders (3 completed). Deleting the list deletes all of them.
+Suggestion: Re-run with --confirm to delete.
+
+$ reminders delete-list Groceries --confirm
+Deleted list 'Groceries' (14 reminders)
+```
+
+With `--format json`:
+
+```console
+$ reminders delete-list Groceries --confirm --format json
+{
+  "calendarIdentifier" : "9E1F1D3B-9C63-4B2E-A7F2-5C1B7E1E8A44",
+  "deleted" : true,
+  "reminderCount" : 14,
+  "title" : "Groceries"
+}
+```
+
+Because a wrong guess would delete the wrong reminders, the list must be given by its ID or its
+whole name (case doesn't matter). A part of a name is `list_not_found`, and two lists with the same
+name are `list_ambiguous`; pass the ID from `show-lists` then. The default list for new reminders
+and read-only lists can't be deleted (`invalid_argument`).
 
 ### Add a reminder to a list
 
@@ -543,19 +587,20 @@ $ reminders show Grocery --format json
 The codes and exit statuses are a stable contract; the `message` and `suggestion` text may change
 between releases.
 
-| Exit status | Code                 | Meaning                                                              |
-| ----------- | -------------------- | -------------------------------------------------------------------- |
-| `2`         | `list_not_found`     | No list matches the name, fragment, or ID, or there is no default list |
-| `3`         | `list_ambiguous`     | A list name fragment is a substring of several list names            |
-| `4`         | `reminder_not_found` | No reminder with the given ID or ID prefix on the given list         |
-| `5`         | `reminder_ambiguous` | A reminder ID prefix matches several reminders on the list           |
-| `6`         | `no_due_date`        | `postpone --next-weekday` on a reminder without a due date           |
-| `7`         | `no_sources`         | `new-list` found no account that can hold reminder lists             |
-| `8`         | `source_not_found`   | `new-list --source` named an account that has no reminder lists      |
-| `9`         | `source_ambiguous`   | `new-list` without `--source` when several accounts hold lists       |
-| `10`        | `save_failed`        | EventKit refused to save or delete                                   |
-| `11`        | `access_denied`      | Reminders access was not granted to the terminal                     |
-| `12`        | `invalid_argument`   | Arguments are invalid for this reminder, e.g. a repeat ending early  |
+| Exit status | Code                    | Meaning                                                                                            |
+| ----------- | ----------------------- | -------------------------------------------------------------------------------------------------- |
+| `2`         | `list_not_found`        | No list matches the name, fragment, or ID, or there is no default list                             |
+| `3`         | `list_ambiguous`        | A list name fragment matches several lists, or several lists share a name                          |
+| `4`         | `reminder_not_found`    | No reminder with the given ID or ID prefix on the given list                                       |
+| `5`         | `reminder_ambiguous`    | A reminder ID prefix matches several reminders on the list                                         |
+| `6`         | `no_due_date`           | `postpone --next-weekday` on a reminder without a due date                                         |
+| `7`         | `no_sources`            | `new-list` found no account that can hold reminder lists                                           |
+| `8`         | `source_not_found`      | `new-list --source` named an account that has no reminder lists                                    |
+| `9`         | `source_ambiguous`      | `new-list` without `--source` when several accounts hold lists                                     |
+| `10`        | `save_failed`           | EventKit refused to save or delete                                                                 |
+| `11`        | `access_denied`         | Reminders access was not granted to the terminal                                                   |
+| `12`        | `invalid_argument`      | Invalid arguments, e.g. a repeat ending early, or `delete-list` on the default or a read-only list |
+| `13`        | `confirmation_required` | `delete-list` without `--confirm`; nothing was deleted                                             |
 
 Exit status `1` is reserved for unexpected errors that don't fit any code. Usage errors (missing
 arguments, unknown flags, values that can't be parsed) are reported by the argument parser in its

@@ -20,6 +20,7 @@ public struct CLIError: Error, Equatable, Encodable {
         case saveFailed = "save_failed"
         case accessDenied = "access_denied"
         case invalidArgument = "invalid_argument"
+        case confirmationRequired = "confirmation_required"
     }
 
     public let code: Code
@@ -43,6 +44,19 @@ public struct CLIError: Error, Equatable, Encodable {
         return CLIError(
             code: .listNotFound,
             message: "No reminders list matching '\(nameOrId)'",
+            suggestion: suggestion)
+    }
+
+    /// `delete-list` only accepts a whole list name or ID. `partialMatches` are the lists the
+    /// argument is a part of; they're named so the user can retype the full name.
+    static func listNotFoundExactly(_ nameOrId: String, partialMatches: [String]) -> CLIError {
+        let suggestion = partialMatches.isEmpty
+            ? "Run 'reminders show-lists' to see available lists and their IDs"
+            : "delete-list needs the full list name or ID. Did you mean: "
+                + "\(partialMatches.map { "'\($0)'" }.joined(separator: ", "))?"
+        return CLIError(
+            code: .listNotFound,
+            message: "No reminders list named '\(nameOrId)'",
             suggestion: suggestion)
     }
 
@@ -123,6 +137,27 @@ public struct CLIError: Error, Equatable, Encodable {
         CLIError(code: .invalidArgument, message: message)
     }
 
+    /// `delete-list` without `--confirm`: the message says what would be deleted.
+    static func confirmationRequired(
+        title: String, reminderCount: Int, completedCount: Int
+    ) -> CLIError {
+        let contents: String
+        switch reminderCount {
+        case 0:
+            contents = "contains no reminders."
+        case 1:
+            contents = "contains 1 reminder (\(completedCount) completed). "
+                + "Deleting the list deletes it too."
+        default:
+            contents = "contains \(reminderCount) reminders (\(completedCount) completed). "
+                + "Deleting the list deletes all of them."
+        }
+        return CLIError(
+            code: .confirmationRequired,
+            message: "'\(title)' \(contents)",
+            suggestion: "Re-run with --confirm to delete.")
+    }
+
     // MARK: - Exit status
 
     /// Each code has its own exit status so shell scripts can branch on `$?` without parsing
@@ -141,6 +176,7 @@ public struct CLIError: Error, Equatable, Encodable {
         case .saveFailed: return ExitCode(10)
         case .accessDenied: return ExitCode(11)
         case .invalidArgument: return ExitCode(12)
+        case .confirmationRequired: return ExitCode(13)
         }
     }
 

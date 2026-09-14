@@ -181,6 +181,68 @@ func resolveCalendar(_ calendars: [EKCalendar], nameOrId: String) throws -> EKCa
     throw CLIError.listNotFound(nameOrId, available: calendars.map { $0.title })
 }
 
+/// The stricter list lookup behind `delete-list`, where a guessed list would destroy the wrong
+/// reminders. Steps 1–3 of `resolveCalendar`, without the substring step:
+///
+/// 1. exact `calendarIdentifier`
+/// 2. exact title
+/// 3. case-insensitive title
+///
+/// Unlike `resolveCalendar`, a title step that matches several lists (e.g. two "Groceries" in
+/// different accounts) is `list_ambiguous` instead of picking the first one. A name that is only
+/// part of a title is `list_not_found`, naming those titles in the suggestion.
+func resolveCalendarExactly(_ calendars: [EKCalendar], nameOrId: String) throws -> EKCalendar {
+    if let calendar = calendars.first(where: { $0.calendarIdentifier == nameOrId }) {
+        return calendar
+    }
+    let titleSteps: [(EKCalendar) -> Bool] = [
+        { $0.title == nameOrId },
+        { $0.title.lowercased() == nameOrId.lowercased() },
+    ]
+    for matches in titleSteps {
+        let candidates = calendars.filter(matches)
+        if candidates.count == 1 {
+            return candidates[0]
+        }
+        if candidates.count > 1 {
+            throw CLIError.listAmbiguous(nameOrId, matches: candidates.map { $0.title })
+        }
+    }
+    let partialMatches = nameOrId.trimmingCharacters(in: .whitespaces).isEmpty
+        ? []
+        : calendars.filter { $0.title.localizedCaseInsensitiveContains(nameOrId) }.map { $0.title }
+    throw CLIError.listNotFoundExactly(nameOrId, partialMatches: partialMatches)
+}
+
+/// The rules `delete-list` applies before removing a list, free of EventKit so they're
+/// unit-testable. Refusals come first, so a run without `--confirm` on a list that can't be
+/// deleted reports why instead of asking for confirmation.
+func checkListDeletion(
+    title: String, isDefault: Bool, allowsModifications: Bool,
+    reminderCount: Int, completedCount: Int, confirm: Bool
+) throws {
+    if isDefault {
+        throw CLIError.invalidArgument(
+            "Cannot delete '\(title)': it is the default list for new reminders. "
+                + "Choose another default list in Reminders.app settings first")
+    }
+    if !allowsModifications {
+        throw CLIError.invalidArgument("Cannot delete '\(title)': the list is read-only")
+    }
+    if !confirm {
+        throw CLIError.confirmationRequired(
+            title: title, reminderCount: reminderCount, completedCount: completedCount)
+    }
+}
+
+/// The `delete-list --format json` output.
+struct DeletedList: Encodable {
+    let deleted = true
+    let title: String
+    let calendarIdentifier: String
+    let reminderCount: Int
+}
+
 /// The shortest ID prefix that's accepted in place of a full reminder ID. Anything shorter only
 /// matches exactly, so a stray one- or two-character argument can't act on the wrong reminder.
 let minimumIdPrefixLength = 4
@@ -1014,6 +1076,42 @@ public final class Reminders {
         case .plain:
             print("Created new list '\(newList.title)'!")
         }
+    }
+
+    func deleteList(nameOrId: String, confirm: Bool, outputFormat: OutputFormat) throws {
+        // All reminder lists, including read-only ones, so those get a clear refusal from
+        // `checkListDeletion` rather than `list_not_found`.
+        let calendar = try resolveCalendarExactly(
+            Store.calendars(for: .reminder), nameOrId: nameOrId)
+        let reminders = self.fetchReminders(on: [calendar], displayOptions: .all)
+
+        try checkListDeletion(
+            title: calendar.title,
+            isDefault: calendar.calendarIdentifier == self.getDefaultList()?.calendarIdentifier,
+            allowsModifications: calendar.allowsContentModifications,
+            reminderCount: reminders.count,
+            completedCount: reminders.filter { $0.isCompleted }.count,
+            confirm: confirm)
+
+        // Build the output before removing, while the calendar is still in the store.
+        let confirmation: String
+        switch outputFormat {
+        case .json:
+            confirmation = encodeToJson(data: DeletedList(
+                title: calendar.title,
+                calendarIdentifier: calendar.calendarIdentifier,
+                reminderCount: reminders.count))
+        case .plain:
+            let count = reminders.count == 1 ? "1 reminder" : "\(reminders.count) reminders"
+            confirmation = "Deleted list '\(calendar.title)' (\(count))"
+        }
+
+        do {
+            try Store.removeCalendar(calendar, commit: true)
+        } catch let error {
+            throw CLIError.saveFailed(action: "delete list '\(calendar.title)'", underlying: error)
+        }
+        print(confirmation)
     }
 
     func edit(

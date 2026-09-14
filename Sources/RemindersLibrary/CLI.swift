@@ -749,6 +749,28 @@ private struct NewList: FormattedCommand {
     }
 }
 
+private struct DeleteList: FormattedCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Delete a list and every reminder on it (requires --confirm)")
+
+    @Argument(
+        help: "The list to delete: its full name or an ID from 'show-lists' (no partial names)",
+        completion: .custom(listNameCompletion))
+    var listNameOrId: String
+
+    @Flag(help: "Actually delete the list; without it, only show what would be deleted")
+    var confirm = false
+
+    @Option(
+        name: .shortAndLong,
+        help: "Output format (plain or json)")
+    var format: OutputFormat = .plain
+
+    func run() throws {
+        try reminders.deleteList(nameOrId: self.listNameOrId, confirm: self.confirm, outputFormat: format)
+    }
+}
+
 private struct Doctor: FormattedCommand {
     static let configuration = CommandConfiguration(
         abstract: "Check Reminders access and the environment, and suggest fixes (exits 1 when a check fails)")
@@ -820,6 +842,7 @@ public struct CLI: ParsableCommand {
             Show.self,
             ShowLists.self,
             NewList.self,
+            DeleteList.self,
             ShowAll.self,
             Today.self,
             Overdue.self,
