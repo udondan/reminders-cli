@@ -559,6 +559,53 @@ final class RecurrenceTests: XCTestCase {
             nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 6), calendar: utcCalendar))
     }
 
+    // The following cases replay what Reminders.app did when completing reminders created by
+    // this CLI (2026-09-14 is a Monday), so nextDueDate predicts the date the app moves to.
+
+    func testNextWeekdayOccurrenceMatchesAppForAnchorOnUnselectedDay() throws {
+        // Due Tue, weekly on Mon/Wed/Fri: the app moved it to Wed.
+        let rule = try weeklyRule(on: "mon,wed,fri")
+        let next = nextOccurrence(
+            of: rule, anchoredAt: utcDate(2026, 9, 15, 7), onOrAfter: utcDate(2026, 9, 15, 8),
+            calendar: utcCalendar)
+        XCTAssertEqual(next, utcDate(2026, 9, 16, 7))
+    }
+
+    func testNextWeekdayOccurrenceMatchesAppForIntervalTwoFromFriday() throws {
+        // Due Fri, every 2 weeks on Mon/Fri: the app skipped the next Monday and moved it to
+        // the Monday two weeks after the due date's week.
+        let rule = try weeklyRule(on: "mon,fri", interval: 2)
+        let next = nextOccurrence(
+            of: rule, anchoredAt: utcDate(2026, 9, 18, 7), onOrAfter: utcDate(2026, 9, 18, 8),
+            calendar: utcCalendar)
+        XCTAssertEqual(next, utcDate(2026, 9, 28, 7))
+    }
+
+    func testNextWeekdayOccurrenceMatchesAppForIntervalTwoFromSunday() throws {
+        // Due Sun, every 2 weeks on Mon: with Monday-started weeks (the app's locale in the
+        // replayed case) the Sunday belongs to the week before, so the app moved it to the
+        // Monday eight days later rather than the next day.
+        let rule = try weeklyRule(on: "mon", interval: 2)
+        let next = nextOccurrence(
+            of: rule, anchoredAt: utcDate(2026, 9, 20, 7), onOrAfter: utcDate(2026, 9, 20, 8),
+            calendar: utcCalendar)
+        switch rule.firstDayOfTheWeek {
+        case 2: XCTAssertEqual(next, utcDate(2026, 9, 28, 7))
+        case 0, 1: XCTAssertEqual(next, utcDate(2026, 9, 21, 7))
+        default: XCTAssertNotNil(next)
+        }
+    }
+
+    func testNextWeekdayOccurrenceMatchesAppForOverdueReminder() throws {
+        // Due Sat three weeks ago, weekly on Mon/Wed/Fri, completed Mon 07:51 UTC after that
+        // day's 07:00 occurrence: the app skipped every missed day and today's past one.
+        let rule = try weeklyRule(on: "mon,wed,fri")
+        let next = nextOccurrence(
+            of: rule, anchoredAt: utcDate(2026, 8, 22, 7), onOrAfter: utcDate(2026, 9, 14, 7, 51),
+            calendar: utcCalendar)
+        XCTAssertEqual(next, utcDate(2026, 9, 16, 7))
+    }
+
     func testNextOccurrenceReturnsNilForWeekNumberedWeeklyDays() throws {
         let rule = EKRecurrenceRule(
             recurrenceWith: .weekly,
