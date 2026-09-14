@@ -42,11 +42,16 @@ final class FilterTests: XCTestCase {
         noDueDate: Bool = false,
         priorities: [Priority] = [],
         search: String? = nil,
-        completedSince: Date? = nil
+        completedSince: Date? = nil,
+        flagged: Bool = false,
+        isFlagged: Bool? = nil
     ) -> Bool {
-        matchesAdditionalFilters(
+        // `nil` keeps the real EventKit lookup, which always reads `false` for a test reminder.
+        let flagReader: (EKReminder) -> Bool = isFlagged.map { value in { _ in value } } ?? { $0.isFlagged }
+        return matchesAdditionalFilters(
             reminder, now: now, overdue: overdue, dueBefore: dueBefore, dueAfter: dueAfter,
-            noDueDate: noDueDate, priorities: priorities, search: search, completedSince: completedSince)
+            noDueDate: noDueDate, priorities: priorities, search: search, completedSince: completedSince,
+            flagged: flagged, isFlagged: flagReader)
     }
 
     func testNoFiltersMatchesEverything() throws {
@@ -165,5 +170,27 @@ final class FilterTests: XCTestCase {
     func testSearchRejectsNonMatchingText() throws {
         let reminder = makeReminder(title: "Errand", notes: "Pick up dry cleaning")
         XCTAssertFalse(matches(reminder, search: "groceries"))
+    }
+
+    func testFlaggedMatchesFlaggedReminder() throws {
+        XCTAssertTrue(matches(makeReminder(), flagged: true, isFlagged: true))
+    }
+
+    func testFlaggedRejectsUnflaggedReminder() throws {
+        XCTAssertFalse(matches(makeReminder(), flagged: true, isFlagged: false))
+    }
+
+    func testFlaggedRejectsReminderWithoutReadableFlag() throws {
+        XCTAssertFalse(matches(makeReminder(), flagged: true))
+    }
+
+    func testNoFlaggedFilterMatchesUnflaggedReminder() throws {
+        XCTAssertTrue(matches(makeReminder(), isFlagged: false))
+    }
+
+    func testFlaggedIsAndedWithOtherFilters() throws {
+        let reminder = makeReminder(priority: .low)
+        XCTAssertTrue(matches(reminder, priorities: [.low], flagged: true, isFlagged: true))
+        XCTAssertFalse(matches(reminder, priorities: [.high], flagged: true, isFlagged: true))
     }
 }

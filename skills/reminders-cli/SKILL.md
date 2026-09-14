@@ -28,7 +28,7 @@ allowed-tools: Bash(reminders:*)
 | Command | Arguments and options |
 | --- | --- |
 | `reminders show-lists` | Lists with their open and overdue reminder counts. `--default-only`/`-d` (only the list Reminders.app adds to by default), `--include-completed` (also count completed reminders, slower), `--sort`/`-s <none\|name\|open\|overdue>` |
-| `reminders show <list>` | Reminders on one list. Filters: `--only-completed`, `--include-completed`, `--include-overdue` (with `--due-date`, also include items due before that date), `--due-date`/`-d <date>`, `--overdue`, `--due-before <date>`, `--due-after <date>`, `--no-due-date`, `--priority <none\|low\|medium\|high>` (repeatable), `--search <text>` (case-insensitive, matches title or notes), `--completed-since <date>`. Sorting: `--sort`/`-s <none\|creation-date\|due-date\|priority>`, `--sort-order`/`-o <ascending\|descending>` |
+| `reminders show <list>` | Reminders on one list. Filters: `--only-completed`, `--include-completed`, `--include-overdue` (with `--due-date`, also include items due before that date), `--due-date`/`-d <date>`, `--overdue`, `--due-before <date>`, `--due-after <date>`, `--no-due-date`, `--priority <none\|low\|medium\|high>` (repeatable), `--search <text>` (case-insensitive, matches title or notes), `--flagged`, `--completed-since <date>`. Sorting: `--sort`/`-s <none\|creation-date\|due-date\|priority>`, `--sort-order`/`-o <ascending\|descending>` |
 | `reminders show-all` | Reminders across all lists. Same filters and sorting as `show`, plus `--list <list>` (repeatable) to restrict to some lists |
 | `reminders add <list> <text...>` | `--due-date`/`-d <date>`, `--priority`/`-p <none\|low\|medium\|high>`, `--notes`/`-n <text>`, `--repeat <daily\|weekly\|monthly\|yearly>`, `--repeat-interval <n>`, `--repeat-until <date>` |
 | `reminders edit <list> <id> [new text...]` | `--due-date`/`-d <date>`, `--clear-due-date`, `--priority`/`-p <value>`, `--clear-priority`, `--notes`/`-n <text>` (overwrites), `--clear-notes`, `--list <list>` (move to another list), `--repeat <frequency>`, `--repeat-interval <n>`, `--repeat-until <date>`, `--clear-repeat-end` (repeat forever), `--clear-repeat` |
@@ -42,7 +42,8 @@ All commands also accept `--format`/`-f <plain|json>`.
 
 Constraints enforced by the CLI (violations are usage errors, exit status 64):
 
-- `show`/`show-all`: `--only-completed` and `--include-completed` are exclusive. `--no-due-date` cannot be combined with `--due-date`, `--due-before`, `--due-after`, `--overdue` or `--include-overdue`. `--completed-since` requires `--only-completed` or `--include-completed`. `--list` exists only on `show-all`.
+- `show`/`show-all`: `--only-completed` and `--include-completed` are exclusive. `--no-due-date` cannot be combined with `--due-date`, `--due-before`, `--due-after`, `--overdue` or `--include-overdue`. `--completed-since` requires `--only-completed` or `--include-completed`. `--list` exists only on `show-all`. `--flagged` combines with every other filter.
+- Flagged state is read-only. `add` and `edit` have no flag options, so tell the user to flag or unflag in Reminders.app.
 - `add`: `--repeat` requires `--due-date`. `--repeat-interval` and `--repeat-until` require `--repeat`. `--repeat-interval` must be at least 1. `--repeat-until` must not be earlier than `--due-date`. `hourly` is rejected because EventKit reminders have no hourly frequency.
 - `edit`: at least one change is required. `--due-date`/`--clear-due-date`, `--priority`/`--clear-priority` and `--notes`/`--clear-notes` are pairwise exclusive. `--clear-repeat` cannot be combined with other repeat options. Changing only the interval or end keeps the existing frequency. Changing the frequency resets the interval to 1 unless `--repeat-interval` is given.
 - `postpone`: exactly one of `date` or `--next-weekday`.
@@ -76,6 +77,7 @@ All dates are ISO 8601 strings in UTC (for example `2026-09-14T07:00:00Z`). Fiel
 | `recurrenceEnd` | string | optional | Date the repeat rule ends. Only for date-ended rules. |
 | `recurrenceCount` | integer | optional | Number of occurrences. Only for count-ended rules (created by Reminders.app, not by this CLI). |
 | `hasRecurrence` | boolean | always | Whether a repeat rule is set. |
+| `isFlagged` | boolean | always | Whether the reminder is flagged. Read-only: no command can set or clear it. Reads `false` on macOS versions that don't expose the flag. |
 | `nextDueDate` | string | optional | Next actionable occurrence of a repeating reminder, computed by the CLI. Only present when `hasRecurrence` is true and the rule is a plain daily/weekly/monthly/yearly (+ interval) rule. |
 <!-- json-fields:end -->
 
