@@ -349,3 +349,56 @@ final class ListingFormatTests: XCTestCase {
         XCTAssertEqual(format, .plain)
     }
 }
+
+/// The mapping from an `EKReminder` to the row `pretty` output renders.
+final class PrettyRowTests: InMemoryReminderTestCase {
+    func testMapsTheReminder() throws {
+        let reminder = makeReminder()
+        reminder.notes = "Balcony too"
+        reminder.priority = Int(EKReminderPriority.high.rawValue)
+        reminder.dueDateComponents = due(2026, 9, 20, hour: 8)
+        reminder.addRecurrenceRule(EKRecurrenceRule(recurrenceWith: .weekly, interval: 2, end: nil))
+
+        let row = PrettyRow(reminder)
+
+        XCTAssertEqual(row.title, "Water plants")
+        let id = reminder.calendarItemExternalIdentifier ?? "<unknown-id>"
+        XCTAssertEqual(row.idPrefix, String(id.prefix(PrettyRow.idPrefixLength)))
+        XCTAssertEqual(row.idPrefix.count, PrettyRow.idPrefixLength)
+        XCTAssertFalse(row.isCompleted)
+        XCTAssertNil(row.completionDate)
+        XCTAssertEqual(row.dueDate, date(2026, 9, 20, 8))
+        XCTAssertFalse(row.dueIsDateOnly)
+        XCTAssertEqual(row.priority, .high)
+        XCTAssertEqual(row.recurrence?.frequency, .weekly)
+        XCTAssertEqual(row.recurrence?.interval, 2)
+        XCTAssertFalse(row.isFlagged)
+        XCTAssertEqual(row.notes, "Balcony too")
+    }
+
+    func testDateOnlyDueDateAndCompletion() throws {
+        let reminder = makeReminder()
+        reminder.dueDateComponents = due(2026, 9, 20)
+        reminder.completionDate = date(2026, 9, 19, 17)
+
+        let row = PrettyRow(reminder)
+
+        XCTAssertEqual(row.dueDate, date(2026, 9, 20))
+        XCTAssertTrue(row.dueIsDateOnly)
+        XCTAssertTrue(row.isCompleted)
+        XCTAssertEqual(row.completionDate, date(2026, 9, 19, 17))
+    }
+
+    func testAbsentFieldsAreNil() throws {
+        let reminder = makeReminder()
+        reminder.notes = ""
+
+        let row = PrettyRow(reminder)
+
+        XCTAssertNil(row.dueDate)
+        XCTAssertFalse(row.dueIsDateOnly)
+        XCTAssertNil(row.priority)
+        XCTAssertNil(row.recurrence)
+        XCTAssertNil(row.notes)
+    }
+}

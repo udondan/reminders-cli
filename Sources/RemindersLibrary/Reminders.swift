@@ -150,6 +150,28 @@ func matchesAdditionalFilters(
     return true
 }
 
+/// The day-granularity `--due-date` filter of `show`/`show-all`: with no `dueOn` every reminder
+/// matches; otherwise a reminder due on the same day does, and with `includeOverdue` one due on an
+/// earlier day too. A reminder without a due date never matches a `dueOn`.
+func matchesDueOn(
+    _ reminder: EKReminder, dueOn: Date?, includeOverdue: Bool, calendar: Calendar = .current
+) -> Bool {
+    guard let dueOn else {
+        return true
+    }
+    guard let reminderDueDate = reminder.dueDateComponents?.date else {
+        return false
+    }
+    switch calendar.compare(reminderDueDate, to: dueOn, toGranularity: .day) {
+    case .orderedSame:
+        return true
+    case .orderedAscending:
+        return includeOverdue
+    case .orderedDescending:
+        return false
+    }
+}
+
 /// Resolves a list argument that may be a `calendarIdentifier` or (part of) a list title. The
 /// steps are tried in order and the first one that produces a hit wins, so exact input always
 /// behaves as it did before forgiving matching existed:
@@ -819,6 +841,210 @@ public enum Priority: String, ExpressibleByArgument {
     }
 }
 
+/// Sets a reminder's due date and replaces its alarms with one at the due time, or none when the
+/// new due date is date-only or nil. Shared by `add`, `edit` and `postpone`.
+func setDueDate(of reminder: EKReminder, to components: DateComponents?) {
+    reminder.dueDateComponents = components
+    for alarm in reminder.alarms ?? [] {
+        reminder.removeAlarm(alarm)
+    }
+    if let components, let date = components.date, components.hour != nil {
+        reminder.addAlarm(EKAlarm(absoluteDate: date))
+    }
+}
+
+/// Everything `add` sets on a new, unsaved reminder besides its list.
+func configureNewReminder(
+    _ reminder: EKReminder,
+    title: String,
+    notes: String?,
+    dueDateComponents: DateComponents?,
+    priority: Priority,
+    recurrence: Recurrence?,
+    recurrenceInterval: Int,
+    recurrenceEndDate: DateComponents?,
+    recurrenceDays: RepeatDays? = nil
+) throws {
+    reminder.title = title
+    reminder.notes = notes
+    reminder.priority = Int(priority.value.rawValue)
+    setDueDate(of: reminder, to: dueDateComponents)
+
+    do {
+        if let rule = try newRecurrenceRule(
+            recurrence, interval: recurrenceInterval, endDate: recurrenceEndDate,
+            days: recurrenceDays)
+        {
+            reminder.addRecurrenceRule(rule)
+        }
+        try validateRecurrenceSchedule(
+            dueDateComponents: reminder.dueDateComponents,
+            rules: reminder.recurrenceRules ?? [])
+    } catch let error as RecurrenceUpdateError {
+        throw CLIError.invalidArgument(error.localizedDescription)
+    }
+}
+
+/// One reminder's share of `edit`, changing it only in memory; `edit` saves the batch. Every change
+/// defaults to "leave as is", and a failed repeat update or schedule check is `invalid_argument`.
+func applyEdit(
+    to reminder: EKReminder,
+    newText: String? = nil,
+    newNotes: String? = nil,
+    clearNotes: Bool = false,
+    newDueDateComponents: DateComponents? = nil,
+    clearDueDate: Bool = false,
+    priority: Priority? = nil,
+    clearPriority: Bool = false,
+    newCalendar: EKCalendar? = nil,
+    newRecurrence: Recurrence? = nil, newRecurrenceInterval: Int? = nil,
+    newRecurrenceEndDate: DateComponents? = nil,
+    clearRecurrenceEnd: Bool = false,
+    newRecurrenceDays: RepeatDays? = nil,
+    clearRecurrenceDays: Bool = false,
+    clearRecurrence: Bool = false
+) throws {
+    let dueDateChangeRequested = clearDueDate || newDueDateComponents != nil
+    let recurrenceChangeRequested = clearRecurrence || newRecurrence != nil
+        || newRecurrenceInterval != nil || newRecurrenceEndDate != nil
+        || newRecurrenceDays != nil || clearRecurrenceDays
+        || clearRecurrenceEnd
+
+    reminder.title = newText ?? reminder.title
+    if clearNotes {
+        reminder.notes = nil
+    } else {
+        reminder.notes = newNotes ?? reminder.notes
+    }
+    if clearPriority {
+        reminder.priority = Int(EKReminderPriority.none.rawValue)
+    } else if let priority {
+        reminder.priority = Int(priority.value.rawValue)
+    }
+
+    if let newCalendar {
+        reminder.calendar = newCalendar
+    }
+
+    if clearDueDate {
+        setDueDate(of: reminder, to: nil)
+    } else if let newDueDateComponents {
+        setDueDate(of: reminder, to: newDueDateComponents)
+    }
+
+    do {
+        if clearRecurrence {
+            for rule in reminder.recurrenceRules ?? [] {
+                reminder.removeRecurrenceRule(rule)
+            }
+        } else {
+            let endUpdate: RecurrenceEndUpdate
+            if clearRecurrenceEnd {
+                endUpdate = .clear
+            } else if let newRecurrenceEndDate {
+                guard let date = recurrenceEndDate(from: newRecurrenceEndDate) else {
+                    throw RecurrenceUpdateError.invalidEndDate
+                }
+                endUpdate = .date(date)
+            } else {
+                endUpdate = .unchanged
+            }
+
+            let daysUpdate: RecurrenceDaysUpdate
+            if clearRecurrenceDays {
+                daysUpdate = .clear
+            } else if let newRecurrenceDays {
+                daysUpdate = .set(newRecurrenceDays)
+            } else {
+                daysUpdate = .unchanged
+            }
+
+            let update = RecurrenceUpdate(
+                recurrence: newRecurrence,
+                interval: newRecurrenceInterval,
+                end: endUpdate,
+                days: daysUpdate)
+            if update.isRequested {
+                let existingRules = reminder.recurrenceRules ?? []
+                let replacements: [EKRecurrenceRule]
+                if newRecurrence == nil {
+                    guard !existingRules.isEmpty else {
+                        throw RecurrenceUpdateError.missingExistingRule
+                    }
+                    replacements = try existingRules.map {
+                        try update.rule(replacing: $0)
+                    }
+                } else {
+                    replacements = [try update.rule(replacing: existingRules.first)]
+                }
+
+                for rule in existingRules {
+                    reminder.removeRecurrenceRule(rule)
+                }
+                for replacement in replacements {
+                    reminder.addRecurrenceRule(replacement)
+                }
+            }
+        }
+        if dueDateChangeRequested || recurrenceChangeRequested {
+            try validateRecurrenceSchedule(
+                dueDateComponents: reminder.dueDateComponents,
+                rules: reminder.recurrenceRules ?? [])
+        }
+    } catch let error as RecurrenceUpdateError {
+        throw CLIError.invalidArgument(error.localizedDescription)
+    }
+}
+
+/// One reminder's share of `postpone`: the new due date, or with `toNextWeekday` the next weekday
+/// after its current one (`no_due_date` without one). Its repeat rules are never read or written,
+/// so they pass through unchanged; the schedule is still checked against the new due date.
+func applyPostpone(
+    to reminder: EKReminder, newDueDate: DateComponents?, toNextWeekday: Bool,
+    calendar: Calendar = .current
+) throws {
+    let resolvedComponents: DateComponents
+    if toNextWeekday {
+        guard let currentDue = reminder.dueDateComponents,
+            let shifted = nextWeekday(after: currentDue, calendar: calendar)
+        else {
+            throw CLIError.noDueDate()
+        }
+        resolvedComponents = shifted
+    } else if let newDueDate {
+        resolvedComponents = newDueDate
+    } else {
+        fatalError("postpone requires either a new due date or --next-weekday")
+    }
+
+    setDueDate(of: reminder, to: resolvedComponents)
+
+    do {
+        try validateRecurrenceSchedule(
+            dueDateComponents: reminder.dueDateComponents,
+            rules: reminder.recurrenceRules ?? [])
+    } catch let error as RecurrenceUpdateError {
+        throw CLIError.invalidArgument(error.localizedDescription)
+    }
+}
+
+/// The confirmation for the reminders a command changed: one plain line each, or JSON — the
+/// single object for a single ID argument, an array for a batch.
+func affectedOutput(
+    _ reminders: [EKReminder], selection: ReminderSelection, outputFormat: OutputFormat,
+    plainLine: (EKReminder) -> String
+) -> String {
+    switch outputFormat {
+    case .json:
+        if !selection.isBatch, let reminder = reminders.first {
+            return encodeToJson(data: reminder)
+        }
+        return encodeToJson(data: reminders)
+    case .plain:
+        return reminders.map(plainLine).joined(separator: "\n")
+    }
+}
+
 public final class Reminders {
     public static func requestAccess() -> (Bool, Error?) {
         let semaphore = DispatchSemaphore(value: 0)
@@ -945,8 +1171,8 @@ public final class Reminders {
         displayOptions: DisplayOptions, outputFormat: ListingFormat, verbose: Bool = false, sort: Sort,
         sortOrder: CustomSortOrder
     ) throws {
-        let calendar = Calendar.current
         let now = Date()
+        let dueOnDate = dueDate?.date
         // Date-only means the whole local day, same rule as --repeat-until; --due-after needs no
         // expansion since a date-only value's `.date` is already midnight, the correct inclusive
         // lower bound.
@@ -964,24 +1190,8 @@ public final class Reminders {
             let id = reminder.calendarItemExternalIdentifier ?? "<unknown-id>"
             let listName = reminder.calendar.title
 
-            let matchesExistingDueDateFilter: Bool
-            if let dueDate = dueDate?.date {
-                guard let reminderDueDate = reminder.dueDateComponents?.date else {
-                    continue
-                }
-                let sameDay = calendar.compare(
-                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedSame
-                let earlierDay = calendar.compare(
-                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedAscending
-                matchesExistingDueDateFilter = sameDay || (includeOverdue && earlierDay)
-            } else {
-                matchesExistingDueDateFilter = true
-            }
-            guard matchesExistingDueDateFilter else {
-                continue
-            }
-
-            guard matchesAdditionalFilters(
+            guard matchesDueOn(reminder, dueOn: dueOnDate, includeOverdue: includeOverdue),
+                  matchesAdditionalFilters(
                 reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
                 dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search,
                 completedSince: completedSinceDate, flagged: flagged
@@ -1036,8 +1246,8 @@ public final class Reminders {
         throws
     {
         let reminderCalendar = try self.calendar(withNameOrId: nameOrId)
-        let calendar = Calendar.current
         let now = Date()
+        let dueOnDate = dueDate?.date
         let dueBeforeDate = dueBefore.flatMap { recurrenceEndDate(from: $0) }
         let dueAfterDate = dueAfter?.date
         let completedSinceDate = completedSince?.date
@@ -1048,24 +1258,8 @@ public final class Reminders {
         for reminder in reminders {
             let id = reminder.calendarItemExternalIdentifier ?? "<unknown-id>"
 
-            let matchesExistingDueDateFilter: Bool
-            if let dueDate = dueDate?.date {
-                guard let reminderDueDate = reminder.dueDateComponents?.date else {
-                    continue
-                }
-                let sameDay = calendar.compare(
-                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedSame
-                let earlierDay = calendar.compare(
-                    reminderDueDate, to: dueDate, toGranularity: .day) == .orderedAscending
-                matchesExistingDueDateFilter = sameDay || (includeOverdue && earlierDay)
-            } else {
-                matchesExistingDueDateFilter = true
-            }
-            guard matchesExistingDueDateFilter else {
-                continue
-            }
-
-            guard matchesAdditionalFilters(
+            guard matchesDueOn(reminder, dueOn: dueOnDate, includeOverdue: includeOverdue),
+                  matchesAdditionalFilters(
                 reminder, now: now, overdue: overdue, dueBefore: dueBeforeDate,
                 dueAfter: dueAfterDate, noDueDate: noDueDate, priorities: priorities, search: search,
                 completedSince: completedSinceDate, flagged: flagged
@@ -1188,12 +1382,6 @@ public final class Reminders {
         outputFormat: OutputFormat) throws
     {
         let calendar = try self.calendar(withNameOrId: nameOrId)
-        let dueDateChangeRequested = clearDueDate || newDueDateComponents != nil
-        let recurrenceChangeRequested = clearRecurrence || newRecurrence != nil
-            || newRecurrenceInterval != nil || newRecurrenceEndDate != nil
-            || newRecurrenceDays != nil || clearRecurrenceDays
-            || clearRecurrenceEnd
-
         let reminders = try resolveReminders(
             self.fetchReminders(on: [calendar], displayOptions: .incomplete),
             idsOrPrefixes: selection.ids, onList: nameOrId)
@@ -1201,16 +1389,14 @@ public final class Reminders {
 
         try self.discardingChangesOnError {
             for reminder in reminders {
-                try self.applyEdit(
+                try applyEdit(
                     to: reminder, newText: newText, newNotes: newNotes, clearNotes: clearNotes,
                     newDueDateComponents: newDueDateComponents, clearDueDate: clearDueDate,
                     priority: priority, clearPriority: clearPriority, newCalendar: newCalendar,
                     newRecurrence: newRecurrence, newRecurrenceInterval: newRecurrenceInterval,
                     newRecurrenceEndDate: newRecurrenceEndDate, clearRecurrenceEnd: clearRecurrenceEnd,
                     newRecurrenceDays: newRecurrenceDays, clearRecurrenceDays: clearRecurrenceDays,
-                    clearRecurrence: clearRecurrence,
-                    dueDateChangeRequested: dueDateChangeRequested,
-                    recurrenceChangeRequested: recurrenceChangeRequested)
+                    clearRecurrence: clearRecurrence)
             }
         }
 
@@ -1218,122 +1404,6 @@ public final class Reminders {
         print(affectedOutput(reminders, selection: selection, outputFormat: outputFormat) {
             "Updated reminder '\($0.title!)'"
         })
-    }
-
-    /// One reminder's share of `edit`, changing it only in memory; `edit` saves the batch.
-    private func applyEdit(
-        to reminder: EKReminder,
-        newText: String?,
-        newNotes: String?,
-        clearNotes: Bool,
-        newDueDateComponents: DateComponents?,
-        clearDueDate: Bool,
-        priority: Priority?,
-        clearPriority: Bool,
-        newCalendar: EKCalendar?,
-        newRecurrence: Recurrence?, newRecurrenceInterval: Int?,
-        newRecurrenceEndDate: DateComponents?,
-        clearRecurrenceEnd: Bool,
-        newRecurrenceDays: RepeatDays?,
-        clearRecurrenceDays: Bool,
-        clearRecurrence: Bool,
-        dueDateChangeRequested: Bool,
-        recurrenceChangeRequested: Bool) throws
-    {
-        reminder.title = newText ?? reminder.title
-        if clearNotes {
-            reminder.notes = nil
-        } else {
-            reminder.notes = newNotes ?? reminder.notes
-        }
-        if clearPriority {
-            reminder.priority = Int(EKReminderPriority.none.rawValue)
-        } else if let priority {
-            reminder.priority = Int(priority.value.rawValue)
-        }
-
-        if let newCalendar {
-            reminder.calendar = newCalendar
-        }
-
-        if clearDueDate {
-            reminder.dueDateComponents = nil
-            for alarm in reminder.alarms ?? [] {
-                reminder.removeAlarm(alarm)
-            }
-        } else if let newDueDateComponents {
-            reminder.dueDateComponents = newDueDateComponents
-            for alarm in reminder.alarms ?? [] {
-                reminder.removeAlarm(alarm)
-            }
-
-            if let dueDate = newDueDateComponents.date, newDueDateComponents.hour != nil {
-                reminder.addAlarm(EKAlarm(absoluteDate: dueDate))
-            }
-        }
-
-        do {
-            if clearRecurrence {
-                for rule in reminder.recurrenceRules ?? [] {
-                    reminder.removeRecurrenceRule(rule)
-                }
-            } else {
-                let endUpdate: RecurrenceEndUpdate
-                if clearRecurrenceEnd {
-                    endUpdate = .clear
-                } else if let newRecurrenceEndDate {
-                    guard let date = recurrenceEndDate(from: newRecurrenceEndDate) else {
-                        throw RecurrenceUpdateError.invalidEndDate
-                    }
-                    endUpdate = .date(date)
-                } else {
-                    endUpdate = .unchanged
-                }
-
-                let daysUpdate: RecurrenceDaysUpdate
-                if clearRecurrenceDays {
-                    daysUpdate = .clear
-                } else if let newRecurrenceDays {
-                    daysUpdate = .set(newRecurrenceDays)
-                } else {
-                    daysUpdate = .unchanged
-                }
-
-                let update = RecurrenceUpdate(
-                    recurrence: newRecurrence,
-                    interval: newRecurrenceInterval,
-                    end: endUpdate,
-                    days: daysUpdate)
-                if update.isRequested {
-                    let existingRules = reminder.recurrenceRules ?? []
-                    let replacements: [EKRecurrenceRule]
-                    if newRecurrence == nil {
-                        guard !existingRules.isEmpty else {
-                            throw RecurrenceUpdateError.missingExistingRule
-                        }
-                        replacements = try existingRules.map {
-                            try update.rule(replacing: $0)
-                        }
-                    } else {
-                        replacements = [try update.rule(replacing: existingRules.first)]
-                    }
-
-                    for rule in existingRules {
-                        reminder.removeRecurrenceRule(rule)
-                    }
-                    for replacement in replacements {
-                        reminder.addRecurrenceRule(replacement)
-                    }
-                }
-            }
-            if dueDateChangeRequested || recurrenceChangeRequested {
-                try validateRecurrenceSchedule(
-                    dueDateComponents: reminder.dueDateComponents,
-                    rules: reminder.recurrenceRules ?? [])
-            }
-        } catch let error as RecurrenceUpdateError {
-            throw CLIError.invalidArgument(error.localizedDescription)
-        }
     }
 
     func postpone(
@@ -1350,37 +1420,7 @@ public final class Reminders {
 
         try self.discardingChangesOnError {
             for reminder in reminders {
-                let resolvedComponents: DateComponents
-                if toNextWeekday {
-                    guard let currentDue = reminder.dueDateComponents,
-                        let shifted = nextWeekday(after: currentDue)
-                    else {
-                        throw CLIError.noDueDate()
-                    }
-                    resolvedComponents = shifted
-                } else if let newDueDateComponents {
-                    resolvedComponents = newDueDateComponents
-                } else {
-                    fatalError("postpone requires either a new due date or --next-weekday")
-                }
-
-                // recurrenceRules is never read or written here, so any
-                // existing repeat rule passes through completely unchanged.
-                reminder.dueDateComponents = resolvedComponents
-                for alarm in reminder.alarms ?? [] {
-                    reminder.removeAlarm(alarm)
-                }
-                if let date = resolvedComponents.date, resolvedComponents.hour != nil {
-                    reminder.addAlarm(EKAlarm(absoluteDate: date))
-                }
-
-                do {
-                    try validateRecurrenceSchedule(
-                        dueDateComponents: reminder.dueDateComponents,
-                        rules: reminder.recurrenceRules ?? [])
-                } catch let error as RecurrenceUpdateError {
-                    throw CLIError.invalidArgument(error.localizedDescription)
-                }
+                try applyPostpone(to: reminder, newDueDate: newDueDateComponents, toNextWeekday: toNextWeekday)
             }
         }
 
@@ -1445,29 +1485,10 @@ public final class Reminders {
         let calendar = try self.calendar(withNameOrId: nameOrId)
         let reminder = EKReminder(eventStore: Store)
         reminder.calendar = calendar
-        reminder.title = string
-        reminder.notes = notes
-        reminder.dueDateComponents = dueDateComponents
-        reminder.priority = Int(priority.value.rawValue)
-        if let dueDate = dueDateComponents, dueDate.hour != nil {
-            if let absoluteDate = dueDate.date {
-                reminder.addAlarm(EKAlarm(absoluteDate: absoluteDate))
-            }
-        }
-
-        do {
-            if let rule = try newRecurrenceRule(
-                recurrence, interval: recurrenceInterval, endDate: recurrenceEndDate,
-                days: recurrenceDays)
-            {
-                reminder.addRecurrenceRule(rule)
-            }
-            try validateRecurrenceSchedule(
-                dueDateComponents: reminder.dueDateComponents,
-                rules: reminder.recurrenceRules ?? [])
-        } catch let error as RecurrenceUpdateError {
-            throw CLIError.invalidArgument(error.localizedDescription)
-        }
+        try configureNewReminder(
+            reminder, title: string, notes: notes, dueDateComponents: dueDateComponents,
+            priority: priority, recurrence: recurrence, recurrenceInterval: recurrenceInterval,
+            recurrenceEndDate: recurrenceEndDate, recurrenceDays: recurrenceDays)
 
         try self.save(reminder, action: "add reminder")
         switch outputFormat {
@@ -1545,23 +1566,6 @@ public final class Reminders {
         } catch {
             Store.reset()
             throw error
-        }
-    }
-
-    /// The confirmation for the reminders a command changed: one plain line each, or JSON — the
-    /// single object for a single ID argument, an array for a batch.
-    private func affectedOutput(
-        _ reminders: [EKReminder], selection: ReminderSelection, outputFormat: OutputFormat,
-        plainLine: (EKReminder) -> String
-    ) -> String {
-        switch outputFormat {
-        case .json:
-            if !selection.isBatch, let reminder = reminders.first {
-                return encodeToJson(data: reminder)
-            }
-            return encodeToJson(data: reminders)
-        case .plain:
-            return reminders.map(plainLine).joined(separator: "\n")
         }
     }
 
