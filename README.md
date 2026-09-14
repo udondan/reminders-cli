@@ -292,6 +292,9 @@ reminders edit Soon 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17 --clear-repeat
 - Use the `nextDueDate` JSON field if you need the next actionable occurrence instead: it's
   computed by this CLI by stepping the rule's frequency/interval forward from its due date,
   respecting `--repeat-until`/occurrence-count ends.
+- Completing a repeating reminder moves it to its next occurrence and leaves a completed copy
+  without a repeat rule. A completed reminder that still has a rule has run out of occurrences,
+  so it has no `nextDueDate`.
 - It's only populated for the plain daily/weekly/monthly/yearly (+ interval) rules this CLI
   itself creates and edits; a rule with EventKit-native selectors such as "the last Friday of
   every month" (only reachable by editing a rule this CLI didn't create) omits the field rather
