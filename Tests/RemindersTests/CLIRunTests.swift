@@ -49,6 +49,24 @@ final class CLIRunTests: XCTestCase {
         assertListNotFound(outcome, list: list, format: .json)
     }
 
+    /// `delete-list` resolves the list before anything else, so an unknown list fails even with
+    /// `--confirm` and nothing on a real machine can be touched.
+    func testDeleteListReportsUnknownListInRequestedFormat() throws {
+        let list = UUID().uuidString
+        let outcome = try CLI.runCommand(["delete-list", list, "--confirm", "--format", "json"])
+        guard case .failed(let error, let format) = outcome else {
+            return XCTFail("expected a failure, got \(outcome)")
+        }
+        XCTAssertEqual(error.code, .listNotFound)
+        XCTAssertEqual(format, .json)
+    }
+
+    func testDeleteListRequiresListArgument() {
+        XCTAssertThrowsError(try CLI.runCommand(["delete-list", "--confirm"])) { error in
+            XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
+        }
+    }
+
     func testValidationErrorsAreRethrownUnchanged() {
         XCTAssertThrowsError(try CLI.runCommand(["show"])) { error in
             XCTAssertFalse(error is CLIError, "usage errors stay with ArgumentParser: \(error)")
