@@ -92,10 +92,12 @@ private struct ShowAll: FormattedCommand {
     @Option(help: "Only show completed reminders completed on or after this date")
     var completedSince: DateComponents?
 
-    @Option(
-        name: .shortAndLong,
-        help: "format, either of 'plain' or 'json'")
-    var format: OutputFormat = .plain
+    @OptionGroup
+    var listing: ListingOptions
+
+    var format: OutputFormat {
+        listing.errorFormat
+    }
 
     func validate() throws {
         if self.onlyCompleted && self.includeCompleted {
@@ -128,7 +130,8 @@ private struct ShowAll: FormattedCommand {
             overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
             noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
             lists: self.list, completedSince: self.completedSince, flagged: self.flagged,
-            displayOptions: displayOptions, outputFormat: format, sort: sort, sortOrder: sortOrder)
+            displayOptions: displayOptions, outputFormat: listing.resolvedFormat, verbose: listing.verbose,
+            sort: sort, sortOrder: sortOrder)
     }
 }
 
@@ -152,15 +155,17 @@ private struct Today: FormattedCommand {
         help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
     var sortOrder: CustomSortOrder = .ascending
 
-    @Option(
-        name: .shortAndLong,
-        help: "format, either of 'plain' or 'json'")
-    var format: OutputFormat = .plain
+    @OptionGroup
+    var listing: ListingOptions
+
+    var format: OutputFormat {
+        listing.errorFormat
+    }
 
     func run() throws {
         try reminders.showAllReminders(
             .today(includeOverdue: !self.noOverdue, lists: self.list, sort: sort, sortOrder: sortOrder),
-            outputFormat: format)
+            outputFormat: listing.resolvedFormat, verbose: listing.verbose)
     }
 }
 
@@ -181,14 +186,16 @@ private struct Overdue: FormattedCommand {
         help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
     var sortOrder: CustomSortOrder = .ascending
 
-    @Option(
-        name: .shortAndLong,
-        help: "format, either of 'plain' or 'json'")
-    var format: OutputFormat = .plain
+    @OptionGroup
+    var listing: ListingOptions
+
+    var format: OutputFormat {
+        listing.errorFormat
+    }
 
     func run() throws {
         try reminders.showAllReminders(
-            .overdue(lists: self.list, sort: sort, sortOrder: sortOrder), outputFormat: format)
+            .overdue(lists: self.list, sort: sort, sortOrder: sortOrder), outputFormat: listing.resolvedFormat, verbose: listing.verbose)
     }
 }
 
@@ -215,10 +222,12 @@ private struct Upcoming: FormattedCommand {
         help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
     var sortOrder: CustomSortOrder = .ascending
 
-    @Option(
-        name: .shortAndLong,
-        help: "format, either of 'plain' or 'json'")
-    var format: OutputFormat = .plain
+    @OptionGroup
+    var listing: ListingOptions
+
+    var format: OutputFormat {
+        listing.errorFormat
+    }
 
     func validate() throws {
         if self.days < 1 {
@@ -231,7 +240,7 @@ private struct Upcoming: FormattedCommand {
             .upcoming(
                 days: self.days, includeOverdue: self.includeOverdue, lists: self.list, sort: sort,
                 sortOrder: sortOrder),
-            outputFormat: format)
+            outputFormat: listing.resolvedFormat, verbose: listing.verbose)
     }
 }
 
@@ -292,10 +301,12 @@ private struct Show: FormattedCommand {
     @Option(help: "Only show completed reminders completed on or after this date")
     var completedSince: DateComponents?
 
-    @Option(
-        name: .shortAndLong,
-        help: "format, either of 'plain' or 'json'")
-    var format: OutputFormat = .plain
+    @OptionGroup
+    var listing: ListingOptions
+
+    var format: OutputFormat {
+        listing.errorFormat
+    }
 
     func validate() throws {
         if self.onlyCompleted && self.includeCompleted {
@@ -328,7 +339,8 @@ private struct Show: FormattedCommand {
             overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
             noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
             completedSince: self.completedSince, flagged: self.flagged,
-            displayOptions: displayOptions, outputFormat: format, sort: sort, sortOrder: sortOrder)
+            displayOptions: displayOptions, outputFormat: listing.resolvedFormat, verbose: listing.verbose,
+            sort: sort, sortOrder: sortOrder)
     }
 }
 

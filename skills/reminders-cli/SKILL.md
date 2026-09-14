@@ -44,7 +44,7 @@ allowed-tools: Bash(reminders:*)
 | `reminders delete-list <list>` | Delete a list and every reminder on it. `--confirm` (required to actually delete; without it the command exits 13 and only reports what would be deleted). `<list>` must be the ID or the whole name, not a part of it. The default list and read-only lists are refused (exit 12) |
 | `reminders doctor` | Diagnose Reminders access and the environment without requesting access. Exits 0 when no check failed, 1 otherwise (the report is still on stdout, nothing on stderr) |
 
-All commands also accept `--format`/`-f <plain|json>`.
+All commands also accept `--format`/`-f <plain|json>`. `show`, `show-all`, `today`, `overdue` and `upcoming` additionally accept `pretty` (a coloured, column-aligned layout with shortened IDs, for people only; never parse it) and `--verbose`/`-v` (only with `pretty`). The `REMINDERS_FORMAT` environment variable can make `pretty` their default, so always pass `--format json` explicitly; an explicit `--format` always wins.
 
 Constraints enforced by the CLI (violations are usage errors, exit status 64):
 
