@@ -419,7 +419,8 @@ final class RecurrenceTests: XCTestCase {
     func testNextOccurrenceDailyStepsForward() throws {
         let anchor = utcDate(2026, 1, 1)
         let rule = Recurrence.daily.recurrenceRule(interval: 1, end: nil)
-        let next = nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 3, 12), calendar: utcCalendar)
+        let next = nextOccurrence(
+            of: rule, anchoredAt: anchor, onOrAfter: utcDate(2026, 1, 3, 12), calendar: utcCalendar)
         XCTAssertEqual(next, utcDate(2026, 1, 4))
     }
 
@@ -690,7 +691,8 @@ final class RecurrenceTests: XCTestCase {
             setPositions: nil,
             end: nil)
         XCTAssertNil(
-            nextOccurrence(of: rule, anchoredAt: utcDate(2026, 1, 1), onOrAfter: utcDate(2026, 3, 1), calendar: utcCalendar))
+            nextOccurrence(
+                of: rule, anchoredAt: utcDate(2026, 1, 1), onOrAfter: utcDate(2026, 3, 1), calendar: utcCalendar))
     }
 
     func testRecurrenceRuleWithDays() throws {

@@ -11,6 +11,8 @@ skill_file="skills/reminders-cli/SKILL.md"
 expected=$(sed -n '/enum EncodingKeys/,/^    }/p' "$swift_file" \
   | sed -n 's/^ *case \([A-Za-z0-9_]*\).*/\1/p')
 
+# The backticks are literal table markup, not command substitution.
+# shellcheck disable=SC2016
 actual=$(sed -n '/<!-- json-fields:start -->/,/<!-- json-fields:end -->/p' "$skill_file" \
   | sed -n 's/^| `\([A-Za-z0-9_]*\)`.*/\1/p')
 

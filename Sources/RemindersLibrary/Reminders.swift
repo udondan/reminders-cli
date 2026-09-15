@@ -2,7 +2,7 @@ import ArgumentParser
 import EventKit
 import Foundation
 
-private let Store = EKEventStore()
+private let eventStore = EKEventStore()
 private let dateFormatter = RelativeDateTimeFormatter()
 private let recurrenceDateFormatter: DateFormatter = {
     let formatter = DateFormatter()
@@ -79,7 +79,8 @@ func format(_ reminder: EKReminder, id: String, listName: String? = nil) -> Stri
     let notesString = reminder.notes.flatMap { $0.isEmpty ? nil : " (\($0))" } ?? ""
     let recurrenceString = formattedRecurrence(from: reminder).map { " (\($0))" } ?? ""
     let flaggedString = reminder.isFlagged ? " (flagged)" : ""
-    return "\(listString)\(id): \(reminder.title ?? "<unknown>")\(notesString)\(dateString)\(priorityString)\(recurrenceString)\(flaggedString)"
+    return "\(listString)\(id): \(reminder.title ?? "<unknown>")"
+        + "\(notesString)\(dateString)\(priorityString)\(recurrenceString)\(flaggedString)"
 }
 
 /// The one definition of "overdue" in the CLI, shared by `show --overdue` and the counts of
@@ -399,11 +400,11 @@ public enum Recurrence: String, ExpressibleByArgument {
 
     var frequency: EKRecurrenceFrequency {
         switch self {
-            case .hourly: return .daily  // EventKit has no hourly frequency; see interval note below.
-            case .daily: return .daily
-            case .weekly: return .weekly
-            case .monthly: return .monthly
-            case .yearly: return .yearly
+        case .hourly: return .daily  // EventKit has no hourly frequency; see interval note below.
+        case .daily: return .daily
+        case .weekly: return .weekly
+        case .monthly: return .monthly
+        case .yearly: return .yearly
         }
     }
 
@@ -822,19 +823,19 @@ public enum Priority: String, ExpressibleByArgument {
 
     var value: EKReminderPriority {
         switch self {
-            case .none: return .none
-            case .low: return .low
-            case .medium: return .medium
-            case .high: return .high
+        case .none: return .none
+        case .low: return .low
+        case .medium: return .medium
+        case .high: return .high
         }
     }
 
     init?(_ priority: EKReminderPriority) {
         switch priority {
-            case .none: return nil
-            case .low: self = .low
-            case .medium: self = .medium
-            case .high: self = .high
+        case .none: return nil
+        case .low: self = .low
+        case .medium: self = .medium
+        case .high: self = .high
         @unknown default:
             return nil
         }
@@ -887,7 +888,7 @@ func configureNewReminder(
 
 /// One reminder's share of `edit`, changing it only in memory; `edit` saves the batch. Every change
 /// defaults to "leave as is", and a failed repeat update or schedule check is `invalid_argument`.
-func applyEdit(
+func applyEdit(  // swiftlint:disable:this cyclomatic_complexity function_body_length
     to reminder: EKReminder,
     newText: String? = nil,
     newNotes: String? = nil,
@@ -1049,15 +1050,15 @@ public final class Reminders {
     public static func requestAccess() -> (Bool, Error?) {
         let semaphore = DispatchSemaphore(value: 0)
         var grantedAccess = false
-        var returnError: Error? = nil
+        var returnError: Error?
         if #available(macOS 14.0, *) {
-            Store.requestFullAccessToReminders { granted, error in
+            eventStore.requestFullAccessToReminders { granted, error in
                 grantedAccess = granted
                 returnError = error
                 semaphore.signal()
             }
         } else {
-            Store.requestAccess(to: .reminder) { granted, error in
+            eventStore.requestAccess(to: .reminder) { granted, error in
                 grantedAccess = granted
                 returnError = error
                 semaphore.signal()
@@ -1073,7 +1074,7 @@ public final class Reminders {
     }
 
     func getDefaultList() -> EKCalendar? {
-        return Store.defaultCalendarForNewReminders()
+        return eventStore.defaultCalendarForNewReminders()
     }
 
     func showLists(
@@ -1100,7 +1101,7 @@ public final class Reminders {
             reminders = self.fetchReminders(on: calendars, displayOptions: .all)
         } else {
             reminders = self.fetchReminders(
-                matching: Store.predicateForIncompleteReminders(
+                matching: eventStore.predicateForIncompleteReminders(
                     withDueDateStarting: nil, ending: nil, calendars: calendars),
                 displayOptions: .incomplete)
         }
@@ -1130,7 +1131,7 @@ public final class Reminders {
             let openReminders = calendars.isEmpty
                 ? []
                 : self.fetchReminders(
-                    matching: Store.predicateForIncompleteReminders(
+                    matching: eventStore.predicateForIncompleteReminders(
                         withDueDateStarting: nil, ending: nil, calendars: calendars),
                     displayOptions: .incomplete)
             data = DoctorData(
@@ -1330,7 +1331,7 @@ public final class Reminders {
         // All reminder lists, including read-only ones, so those get a clear refusal from
         // `checkListDeletion` rather than `list_not_found`.
         let calendar = try resolveCalendarExactly(
-            Store.calendars(for: .reminder), nameOrId: nameOrId)
+            eventStore.calendars(for: .reminder), nameOrId: nameOrId)
         let reminders = self.fetchReminders(on: [calendar], displayOptions: .all)
 
         try checkListDeletion(
@@ -1355,7 +1356,7 @@ public final class Reminders {
         }
 
         do {
-            try Store.removeCalendar(calendar, commit: true)
+            try eventStore.removeCalendar(calendar, commit: true)
         } catch let error {
             throw CLIError.saveFailed(action: "delete list '\(calendar.title)'", underlying: error)
         }
@@ -1448,7 +1449,9 @@ public final class Reminders {
         })
     }
 
-    func delete(items selection: ReminderSelection, onListNamedOrId nameOrId: String, outputFormat: OutputFormat) throws {
+    func delete(
+        items selection: ReminderSelection, onListNamedOrId nameOrId: String, outputFormat: OutputFormat
+    ) throws {
         let calendar = try self.calendar(withNameOrId: nameOrId)
         // External identifiers are stable regardless of completion state, so a
         // reminder already marked complete can still be found and deleted by its id.
@@ -1464,7 +1467,7 @@ public final class Reminders {
 
         try self.commitAll(action: "delete reminder", count: reminders.count) {
             for reminder in reminders {
-                try Store.remove(reminder, commit: false)
+                try eventStore.remove(reminder, commit: false)
             }
         }
         print(confirmation)
@@ -1483,7 +1486,7 @@ public final class Reminders {
         outputFormat: OutputFormat) throws
     {
         let calendar = try self.calendar(withNameOrId: nameOrId)
-        let reminder = EKReminder(eventStore: Store)
+        let reminder = EKReminder(eventStore: eventStore)
         reminder.calendar = calendar
         try configureNewReminder(
             reminder, title: string, notes: notes, dueDateComponents: dueDateComponents,
@@ -1511,7 +1514,7 @@ public final class Reminders {
 
     private func fetchReminders(on calendars: [EKCalendar], displayOptions: DisplayOptions) -> [EKReminder] {
         return self.fetchReminders(
-            matching: Store.predicateForReminders(in: calendars), displayOptions: displayOptions)
+            matching: eventStore.predicateForReminders(in: calendars), displayOptions: displayOptions)
     }
 
     /// EventKit only offers a callback-based fetch; block on it once here so every command
@@ -1520,7 +1523,7 @@ public final class Reminders {
     private func fetchReminders(matching predicate: NSPredicate, displayOptions: DisplayOptions) -> [EKReminder] {
         let semaphore = DispatchSemaphore(value: 0)
         var fetched: [EKReminder] = []
-        Store.fetchReminders(matching: predicate) { reminders in
+        eventStore.fetchReminders(matching: predicate) { reminders in
             fetched = reminders?
                 .filter { self.shouldDisplay(reminder: $0, displayOptions: displayOptions) } ?? []
             semaphore.signal()
@@ -1531,7 +1534,7 @@ public final class Reminders {
 
     private func save(_ reminder: EKReminder, action: String) throws {
         do {
-            try Store.save(reminder, commit: true)
+            try eventStore.save(reminder, commit: true)
         } catch let error {
             throw CLIError.saveFailed(action: action, underlying: error)
         }
@@ -1541,7 +1544,7 @@ public final class Reminders {
     private func saveAll(_ reminders: [EKReminder], action: String) throws {
         try self.commitAll(action: action, count: reminders.count) {
             for reminder in reminders {
-                try Store.save(reminder, commit: false)
+                try eventStore.save(reminder, commit: false)
             }
         }
     }
@@ -1551,9 +1554,9 @@ public final class Reminders {
     private func commitAll(action: String, count: Int, stage: () throws -> Void) throws {
         do {
             try stage()
-            try Store.commit()
+            try eventStore.commit()
         } catch let error {
-            Store.reset()
+            eventStore.reset()
             throw CLIError.saveFailed(action: count > 1 ? action + "s" : action, underlying: error)
         }
     }
@@ -1564,7 +1567,7 @@ public final class Reminders {
         do {
             try body()
         } catch {
-            Store.reset()
+            eventStore.reset()
             throw error
         }
     }
@@ -1587,7 +1590,7 @@ public final class Reminders {
     }
 
     private func getCalendars() -> [EKCalendar] {
-        return Store.calendars(for: .reminder)
+        return eventStore.calendars(for: .reminder)
                     .filter { $0.allowsContentModifications }
     }
 
@@ -1640,7 +1643,8 @@ func selectListSource(requested: String?, from candidates: [ListSourceCandidate]
 private func encodeToJson(data: Encodable) -> String {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+    // Encoding the CLI's own Encodable values can't fail; crashing beats printing nothing.
+    // swiftlint:disable:next force_try
     let encoded = try! encoder.encode(data)
     return String(data: encoded, encoding: .utf8) ?? ""
 }
-

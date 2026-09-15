@@ -21,6 +21,8 @@ private final class FakeRemReminder: NSObject {
 }
 
 private final class FakeBackingObject: NSObject {
+    // The name must match the private EventKit key `readFlag` walks.
+    // swiftlint:disable:next identifier_name
     @objc let _reminder: NSObject?
 
     init(reminder: NSObject?) {

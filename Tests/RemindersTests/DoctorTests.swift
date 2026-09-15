@@ -212,7 +212,8 @@ final class DoctorTests: XCTestCase {
         XCTAssertEqual(
             applicationName(
                 fromExecutablePath:
-                    "/Applications/Visual Studio Code.app/Contents/Frameworks/Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin)"),
+                    "/Applications/Visual Studio Code.app/Contents/Frameworks/"
+                    + "Code Helper (Plugin).app/Contents/MacOS/Code Helper (Plugin)"),
             "Visual Studio Code")
         XCTAssertNil(applicationName(fromExecutablePath: "/bin/zsh"))
         XCTAssertNil(applicationName(fromExecutablePath: "/usr/local/.app/tool"))

@@ -215,9 +215,11 @@ final class PrettyOutputTests: XCTestCase {
     func testColours() {
         let style = PrettyStyle(enabled: true)
         let lines = render(
-            [PrettyGroup(title: "Soon", rows: [
-                row("a", id: "1", due: jan(2, 10)), row("b", id: "2", completed: jan(4, 8)),
-            ])],
+            [
+                PrettyGroup(title: "Soon", rows: [
+                    row("a", id: "1", due: jan(2, 10)), row("b", id: "2", completed: jan(4, 8)),
+                ]),
+            ],
             style: style)
         XCTAssertEqual(lines, [
             "\u{1B}[1mSoon (1 open, 1 overdue, 1 completed)\u{1B}[0m",
@@ -255,10 +257,12 @@ final class PrettyOutputTests: XCTestCase {
         let id = "44C111DE-0B69-4E96-8C93-6A5D0A6C2A17"
         XCTAssertEqual(
             format(reminder, id: id),
-            "44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (Remember the changelog) (priority: high) (repeats: weekly, interval: 2)")
+            "44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (Remember the changelog) "
+                + "(priority: high) (repeats: weekly, interval: 2)")
         XCTAssertEqual(
             format(reminder, id: id, listName: "Soon"),
-            "Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (Remember the changelog) (priority: high) (repeats: weekly, interval: 2)")
+            "Soon: 44C111DE-0B69-4E96-8C93-6A5D0A6C2A17: Ship reminders-cli (Remember the changelog) "
+                + "(priority: high) (repeats: weekly, interval: 2)")
     }
 
     private func plainReminder(_ title: String) -> EKReminder {
@@ -336,8 +340,9 @@ final class ListingFormatTests: XCTestCase {
         for command in [["show", "x"], ["show-all"], ["today"], ["overdue"], ["upcoming"]] {
             XCTAssertNoThrow(try CLI.parseAsRoot(command + ["--format", "pretty"]), "\(command)")
         }
-        assertParseError(["add", "x", "y", "--format", "pretty"], contains: "The value 'pretty' is invalid for '--format <format>'")
-        assertParseError(["show-lists", "--format", "pretty"], contains: "The value 'pretty' is invalid for '--format <format>'")
+        let invalidPretty = "The value 'pretty' is invalid for '--format <format>'"
+        assertParseError(["add", "x", "y", "--format", "pretty"], contains: invalidPretty)
+        assertParseError(["show-lists", "--format", "pretty"], contains: invalidPretty)
     }
 
     func testListingCommandsReportErrorsInResolvedFormat() throws {

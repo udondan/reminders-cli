@@ -6,7 +6,7 @@ private let allComponents: Set<Calendar.Component> = [
     .era, .year, .yearForWeekOfYear, .quarter, .month,
     .weekOfYear, .weekOfMonth, .weekday, .weekdayOrdinal, .day,
     .hour, .minute, .second, .nanosecond,
-    .calendar, .timeZone
+    .calendar, .timeZone,
 ]
 let timeComponents: Set<Calendar.Component> = [
     .hour, .minute, .second, .nanosecond,

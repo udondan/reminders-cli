@@ -37,14 +37,26 @@ struct RepeatDays: Equatable {
     }
 }
 
-private let weekdayNames: [(weekday: EKWeekday, short: String, full: String)] = [
-    (.sunday, "sun", "sunday"),
-    (.monday, "mon", "monday"),
-    (.tuesday, "tue", "tuesday"),
-    (.wednesday, "wed", "wednesday"),
-    (.thursday, "thu", "thursday"),
-    (.friday, "fri", "friday"),
-    (.saturday, "sat", "saturday"),
+private struct WeekdayName {
+    let weekday: EKWeekday
+    let short: String
+    let full: String
+
+    init(_ weekday: EKWeekday, _ short: String, _ full: String) {
+        self.weekday = weekday
+        self.short = short
+        self.full = full
+    }
+}
+
+private let weekdayNames: [WeekdayName] = [
+    WeekdayName(.sunday, "sun", "sunday"),
+    WeekdayName(.monday, "mon", "monday"),
+    WeekdayName(.tuesday, "tue", "tuesday"),
+    WeekdayName(.wednesday, "wed", "wednesday"),
+    WeekdayName(.thursday, "thu", "thursday"),
+    WeekdayName(.friday, "fri", "friday"),
+    WeekdayName(.saturday, "sat", "saturday"),
 ]
 
 private let repeatDayAliases: [String: [EKWeekday]] = [
