@@ -690,8 +690,8 @@ brew install udondan/software/reminders-cli
 
 ### From GitHub releases
 
-Download the latest release from
-[here](https://github.com/udondan/reminders-cli/releases)
+Download the latest release from the
+[releases page](https://github.com/udondan/reminders-cli/releases)
 
 ```console
 tar -zxvf reminders.tar.gz

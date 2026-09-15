@@ -117,7 +117,8 @@ private struct ShowAll: FormattedCommand {
                 || self.overdue || self.includeOverdue)
         {
             throw ValidationError(
-                "Cannot combine --no-due-date with --due-date, --due-before, --due-after, --overdue, or --include-overdue")
+                "Cannot combine --no-due-date with --due-date, --due-before, --due-after, --overdue, "
+                    + "or --include-overdue")
         }
         if self.completedSince != nil && !self.onlyCompleted && !self.includeCompleted {
             throw ValidationError(
@@ -145,7 +146,8 @@ private struct ShowAll: FormattedCommand {
 
 private struct Today: FormattedCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Show reminders due today or overdue (same as 'show-all --due-date today --include-overdue --sort due-date')")
+        abstract: "Show reminders due today or overdue "
+            + "(same as 'show-all --due-date today --include-overdue --sort due-date')")
 
     @Flag(help: "Only show reminders due today, without overdue ones")
     var noOverdue = false
@@ -203,13 +205,15 @@ private struct Overdue: FormattedCommand {
 
     func run() throws {
         try reminders.showAllReminders(
-            .overdue(lists: self.list, sort: sort, sortOrder: sortOrder), outputFormat: listing.resolvedFormat, verbose: listing.verbose)
+            .overdue(lists: self.list, sort: sort, sortOrder: sortOrder),
+            outputFormat: listing.resolvedFormat, verbose: listing.verbose)
     }
 }
 
 private struct Upcoming: FormattedCommand {
     static let configuration = CommandConfiguration(
-        abstract: "Show reminders due from now through the next 7 days (same as 'show-all --due-after <current time> --due-before \"in 7 days\" --sort due-date')")
+        abstract: "Show reminders due from now through the next 7 days "
+            + "(same as 'show-all --due-after <current time> --due-before \"in 7 days\" --sort due-date')")
 
     @Option(help: "How many days ahead to look, including the whole last day")
     var days: Int = 7
@@ -327,7 +331,8 @@ private struct Show: FormattedCommand {
                 || self.overdue || self.includeOverdue)
         {
             throw ValidationError(
-                "Cannot combine --no-due-date with --due-date, --due-before, --due-after, --overdue, or --include-overdue")
+                "Cannot combine --no-due-date with --due-date, --due-before, --due-after, --overdue, "
+                    + "or --include-overdue")
         }
         if self.completedSince != nil && !self.onlyCompleted && !self.includeCompleted {
             throw ValidationError(
@@ -390,7 +395,7 @@ private struct Add: FormattedCommand {
     @Option(
         name: [.customLong("repeat")],
         help: "Repeat the reminder, one of: daily, weekly, monthly, yearly")
-    var repeat_: Recurrence?
+    var repeatFrequency: Recurrence?
 
     @Option(
         name: .long,
@@ -404,28 +409,29 @@ private struct Add: FormattedCommand {
 
     @Option(
         name: .long,
-        help: "Repeat weekly on these days, comma-separated: mon..sun or full names, or weekdays/weekends; implies --repeat weekly",
+        help: ArgumentHelp("Repeat weekly on these days, comma-separated: mon..sun or full names, "
+            + "or weekdays/weekends; implies --repeat weekly"),
         transform: RepeatDays.init(parsing:))
     var repeatOn: RepeatDays?
 
     /// `--repeat-on` on its own means a weekly repeat.
     private var recurrence: Recurrence? {
-        repeat_ ?? (repeatOn != nil ? .weekly : nil)
+        repeatFrequency ?? (repeatOn != nil ? .weekly : nil)
     }
 
     func validate() throws {
-        if let repeat_ = repeat_, !repeat_.isRepresentable {
+        if let repeatFrequency = repeatFrequency, !repeatFrequency.isRepresentable {
             throw ValidationError(
-                "--repeat \(repeat_.rawValue) is not supported: EventKit reminders have no hourly "
+                "--repeat \(repeatFrequency.rawValue) is not supported: EventKit reminders have no hourly "
                     + "recurrence frequency (Reminders.app itself doesn't expose this either). Use "
                     + "daily, weekly, monthly, or yearly.")
         }
-        if let repeat_, repeatOn != nil, repeat_ != .weekly {
+        if let repeatFrequency, repeatOn != nil, repeatFrequency != .weekly {
             throw ValidationError("--repeat-on requires --repeat weekly")
         }
         if recurrence != nil && dueDate == nil {
             throw ValidationError(
-                repeat_ != nil ? "--repeat requires --due-date" : "--repeat-on requires --due-date")
+                repeatFrequency != nil ? "--repeat requires --due-date" : "--repeat-on requires --due-date")
         }
         if let repeatUntil, let dueDate,
             let endDate = recurrenceEndDate(from: repeatUntil),
@@ -467,7 +473,8 @@ private struct Complete: FormattedCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The ids of the reminders to complete, or unique prefixes of at least 4 characters, see 'show' for IDs; \(batchIdsHelp)")
+        help: ArgumentHelp("The ids of the reminders to complete, or unique prefixes of at least 4 characters, "
+            + "see 'show' for IDs; \(batchIdsHelp)"))
     var ids: [String] = []
 
     @Option(
@@ -496,7 +503,8 @@ private struct Uncomplete: FormattedCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The ids of the reminders to uncomplete, or unique prefixes of at least 4 characters, see 'show' for IDs; \(batchIdsHelp)")
+        help: ArgumentHelp("The ids of the reminders to uncomplete, or unique prefixes of at least 4 characters, "
+            + "see 'show' for IDs; \(batchIdsHelp)"))
     var ids: [String] = []
 
     @Option(
@@ -525,7 +533,8 @@ private struct Delete: FormattedCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The ids of the reminders to delete, or unique prefixes of at least 4 characters, see 'show' for IDs; \(batchIdsHelp)")
+        help: ArgumentHelp("The ids of the reminders to delete, or unique prefixes of at least 4 characters, "
+            + "see 'show' for IDs; \(batchIdsHelp)"))
     var ids: [String] = []
 
     @Option(
@@ -569,7 +578,8 @@ private struct Edit: FormattedCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to edit, or a unique prefix of at least 4 characters, see 'show' for IDs; \(batchIdsHelp)")
+        help: ArgumentHelp("The id of the reminder to edit, or a unique prefix of at least 4 characters, "
+            + "see 'show' for IDs; \(batchIdsHelp)"))
     var id: String
 
     @Option(
@@ -597,7 +607,7 @@ private struct Edit: FormattedCommand {
     @Option(
         name: [.customLong("repeat")],
         help: "Set (or replace) the reminder's repeat, one of: daily, weekly, monthly, yearly")
-    var repeat_: Recurrence?
+    var repeatFrequency: Recurrence?
 
     @Option(
         name: .long,
@@ -621,7 +631,8 @@ private struct Edit: FormattedCommand {
 
     @Option(
         name: .long,
-        help: "Repeat on these days, comma-separated: mon..sun or full names, or weekdays/weekends; replaces only the days of a weekly repeat",
+        help: ArgumentHelp("Repeat on these days, comma-separated: mon..sun or full names, or weekdays/weekends; "
+            + "replaces only the days of a weekly repeat"),
         transform: RepeatDays.init(parsing:))
     var repeatOn: RepeatDays?
 
@@ -648,6 +659,8 @@ private struct Edit: FormattedCommand {
         help: "Output format (plain or json)")
     var format: OutputFormat = .plain
 
+    // A flat list of independent option conflicts, one check per rule.
+    // swiftlint:disable:next cyclomatic_complexity
     func validate() throws {
         if !self.reminder.isEmpty && ReminderSelection.isBatch(arguments: [self.id]) {
             throw ValidationError("New reminder text can only be set on one reminder at a time")
@@ -662,7 +675,7 @@ private struct Edit: FormattedCommand {
             throw ValidationError("Cannot specify both --notes and --clear-notes")
         }
 
-        let changesRecurrence = self.repeat_ != nil || self.repeatInterval != nil
+        let changesRecurrence = self.repeatFrequency != nil || self.repeatInterval != nil
             || self.repeatUntil != nil || self.clearRepeatEnd
             || self.repeatOn != nil || self.clearRepeatOn
 
@@ -677,9 +690,9 @@ private struct Edit: FormattedCommand {
         if self.clearRepeat && changesRecurrence {
             throw ValidationError("Cannot combine --clear-repeat with another repeat option")
         }
-        if let repeat_ = repeat_, !repeat_.isRepresentable {
+        if let repeatFrequency = repeatFrequency, !repeatFrequency.isRepresentable {
             throw ValidationError(
-                "--repeat \(repeat_.rawValue) is not supported: EventKit reminders have no hourly "
+                "--repeat \(repeatFrequency.rawValue) is not supported: EventKit reminders have no hourly "
                     + "recurrence frequency (Reminders.app itself doesn't expose this either). Use "
                     + "daily, weekly, monthly, or yearly.")
         }
@@ -695,7 +708,7 @@ private struct Edit: FormattedCommand {
         if self.repeatOn != nil && self.clearRepeatOn {
             throw ValidationError("Cannot specify both --repeat-on and --clear-repeat-on")
         }
-        if let repeat_, repeat_ != .weekly, self.repeatOn != nil || self.clearRepeatOn {
+        if let repeatFrequency, repeatFrequency != .weekly, self.repeatOn != nil || self.clearRepeatOn {
             throw ValidationError("--repeat-on and --clear-repeat-on require a weekly repeat")
         }
     }
@@ -713,7 +726,7 @@ private struct Edit: FormattedCommand {
             priority: self.priority,
             clearPriority: self.clearPriority,
             newListName: self.list,
-            newRecurrence: self.repeat_,
+            newRecurrence: self.repeatFrequency,
             newRecurrenceInterval: self.repeatInterval,
             newRecurrenceEndDate: self.repeatUntil,
             clearRecurrenceEnd: self.clearRepeatEnd,
@@ -735,7 +748,8 @@ private struct Postpone: FormattedCommand {
     var listNameOrId: String
 
     @Argument(
-        help: "The id of the reminder to postpone, or a unique prefix of at least 4 characters, see 'show' for IDs; \(batchIdsHelp)")
+        help: ArgumentHelp("The id of the reminder to postpone, or a unique prefix of at least 4 characters, "
+            + "see 'show' for IDs; \(batchIdsHelp)"))
     var id: String
 
     @Argument(
@@ -744,7 +758,8 @@ private struct Postpone: FormattedCommand {
 
     @Flag(
         name: .long,
-        help: "Move the due date to the next weekday (Mon-Fri), preserving its time of day; the reminder must already have a due date")
+        help: ArgumentHelp("Move the due date to the next weekday (Mon-Fri), preserving its time of day; "
+            + "the reminder must already have a due date"))
     var nextWeekday = false
 
     @Option(
@@ -771,7 +786,6 @@ private struct Postpone: FormattedCommand {
         )
     }
 }
-
 
 private struct NewList: FormattedCommand {
     static let configuration = CommandConfiguration(

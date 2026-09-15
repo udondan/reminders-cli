@@ -12,18 +12,18 @@ public enum Sort: String, Decodable, ExpressibleByArgument, CaseIterable {
     func sortFunction(order: CustomSortOrder) -> (EKReminder, EKReminder) -> Bool {
         let comparison: (Date, Date) -> Bool = order == .ascending ? (<) : (>)
         switch self {
-            case .none: return { _, _ in fatalError() }
-            case .creationDate: return { comparison($0.creationDate!, $1.creationDate!) }
-            case .dueDate: return { dueDateComparison($0, $1, using: comparison) }
-            case .priority: return {
-                let rankA = priorityRank($0)
-                let rankB = priorityRank($1)
-                if rankA != rankB {
-                    return order == .ascending ? rankA < rankB : rankA > rankB
-                }
-                // Ties are always broken by due date ascending, regardless of --sort-order.
-                return dueDateComparison($0, $1, using: (<))
+        case .none: return { _, _ in fatalError() }
+        case .creationDate: return { comparison($0.creationDate!, $1.creationDate!) }
+        case .dueDate: return { dueDateComparison($0, $1, using: comparison) }
+        case .priority: return {
+            let rankA = priorityRank($0)
+            let rankB = priorityRank($1)
+            if rankA != rankB {
+                return order == .ascending ? rankA < rankB : rankA > rankB
             }
+            // Ties are always broken by due date ascending, regardless of --sort-order.
+            return dueDateComparison($0, $1, using: (<))
+        }
         }
     }
 }
@@ -32,10 +32,10 @@ public enum Sort: String, Decodable, ExpressibleByArgument, CaseIterable {
 /// `Priority`'s declaration order doesn't match this ranking, so it's mapped explicitly here.
 private func priorityRank(_ reminder: EKReminder) -> Int {
     switch Priority(reminder.mappedPriority) ?? .none {
-        case .high: return 0
-        case .medium: return 1
-        case .low: return 2
-        case .none: return 3
+    case .high: return 0
+    case .medium: return 1
+    case .low: return 2
+    case .none: return 3
     }
 }
 
@@ -45,10 +45,10 @@ private func dueDateComparison(
     _ a: EKReminder, _ b: EKReminder, using comparison: (Date, Date) -> Bool
 ) -> Bool {
     switch (a.dueDateComponents, b.dueDateComponents) {
-        case (.none, .none): return false
-        case (.none, .some): return false
-        case (.some, .none): return true
-        case (.some, .some): return comparison(a.dueDateComponents!.date!, b.dueDateComponents!.date!)
+    case (.none, .none): return false
+    case (.none, .some): return false
+    case (.some, .none): return true
+    case (.some, .some): return comparison(a.dueDateComponents!.date!, b.dueDateComponents!.date!)
     }
 }
 
@@ -74,10 +74,10 @@ enum ListSort: String, ExpressibleByArgument, CaseIterable {
 
     func apply(to summaries: [ListSummary]) -> [ListSummary] {
         switch self {
-            case .none: return summaries
-            case .name: return summaries.sorted(by: nameAscending)
-            case .open: return summaries.sorted { descending($0.openCount, $1.openCount, thenBy: $0, $1) }
-            case .overdue: return summaries.sorted { descending($0.overdueCount, $1.overdueCount, thenBy: $0, $1) }
+        case .none: return summaries
+        case .name: return summaries.sorted(by: nameAscending)
+        case .open: return summaries.sorted { descending($0.openCount, $1.openCount, thenBy: $0, $1) }
+        case .overdue: return summaries.sorted { descending($0.overdueCount, $1.overdueCount, thenBy: $0, $1) }
         }
     }
 }

@@ -31,6 +31,8 @@ extension EKReminder: @retroactive Encodable {
         case nextDueDateLocal
     }
 
+    // One flat pass in key order, which the field table in SKILL.md mirrors.
+    // swiftlint:disable:next cyclomatic_complexity function_body_length
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: EncodingKeys.self)
         try container.encode(self.calendarItemExternalIdentifier, forKey: .externalId)
@@ -70,11 +72,11 @@ extension EKReminder: @retroactive Encodable {
             try container.encodeIfPresent(localISO8601(dueDateComponents.date), forKey: .dueDateLocal)
             try container.encode(isDateOnly(dueDateComponents), forKey: .isAllDay)
         }
-        
+
         if let lastModifiedDate = self.lastModifiedDate {
             try container.encode(format(lastModifiedDate), forKey: .lastModified)
         }
-        
+
         if let creationDate = self.creationDate {
             try container.encode(format(creationDate), forKey: .creationDate)
         }

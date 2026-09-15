@@ -21,6 +21,8 @@ struct ReminderSelection: Equatable {
     init(
         arguments: [String],
         readStandardInput: () -> String = {
+            // Lossy on purpose: invalid bytes still reach the ID lookup and are reported there.
+            // swiftlint:disable:next optional_data_string_conversion
             String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
         }
     ) throws {

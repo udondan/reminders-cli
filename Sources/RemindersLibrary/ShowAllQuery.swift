@@ -5,11 +5,11 @@ import Foundation
 /// so they share every filter and sort rule with `show-all` and keep no logic of their own. The
 /// builders take `now` and `calendar` so tests can pin the resulting dates.
 struct ShowAllQuery: Equatable {
-    var dueOn: DateComponents? = nil
+    var dueOn: DateComponents?
     var includeOverdue = false
     var overdue = false
-    var dueBefore: DateComponents? = nil
-    var dueAfter: DateComponents? = nil
+    var dueBefore: DateComponents?
+    var dueAfter: DateComponents?
     var lists: [String] = []
     var sort: Sort = .dueDate
     var sortOrder: CustomSortOrder = .ascending

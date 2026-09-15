@@ -106,7 +106,8 @@ final class CLIRunTests: XCTestCase {
     /// Only the parse failure is exercised: a valid `show-lists` would print the machine's real
     /// lists on a developer machine that has granted the test runner access.
     func testShowListsRejectsUnknownSort() {
-        assertUsageError(["show-lists", "--sort", "bogus"], contains: "The value 'bogus' is invalid for '--sort <sort>'")
+        assertUsageError(
+            ["show-lists", "--sort", "bogus"], contains: "The value 'bogus' is invalid for '--sort <sort>'")
     }
 
     /// The convenience commands run `show-all`'s query, so an unknown `--list` fails the same way

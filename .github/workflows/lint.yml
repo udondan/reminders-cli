@@ -1,0 +1,150 @@
+---
+name: Lint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  # Used by both the shell and the actions job.
+  SHELLCHECK_VERSION: 0.11.0
+  SHELLCHECK_SHA256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+
+# Each linter is its own job so a failure names the file type. Tools are pinned to exact versions,
+# and downloaded binaries are checked against the SHA-256 digest GitHub records for the release asset.
+jobs:
+  markdown:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Files and rules come from .markdownlint-cli2.yaml, whose globs add to the action's default of the root files.
+      - uses: DavidAnson/markdownlint-cli2-action@21c1be1b93ad9ed58fa840aacc3f279cde2a72ff # v24.2.0
+
+  markdown-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Restore lychee cache
+        uses: actions/cache@v6
+        with:
+          path: .lycheecache
+          key: lychee-${{ github.sha }}
+          restore-keys: lychee-
+
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          lycheeVersion: v0.24.2
+          args: --config lychee.toml --no-progress README.md CLAUDE.md 'skills/**/*.md'
+          jobSummary: false
+
+  swift:
+    runs-on: ubuntu-latest
+    env:
+      SWIFTLINT_VERSION: 0.65.1
+      SWIFTLINT_SHA256: caeed6f4a679c35539ffaf124f6c4ab4a8416917f7d8796279dc52b74026059d
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install SwiftLint
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/swiftlint.zip" \
+            "https://github.com/realm/SwiftLint/releases/download/$SWIFTLINT_VERSION/swiftlint_linux_amd64.zip"
+          echo "$SWIFTLINT_SHA256  $RUNNER_TEMP/swiftlint.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/swiftlint.zip" -d "$RUNNER_TEMP/swiftlint"
+          echo "$RUNNER_TEMP/swiftlint" >> "$GITHUB_PATH"
+
+      - name: SwiftLint
+        run: swiftlint lint --strict --reporter github-actions-logging
+
+  makefile:
+    runs-on: ubuntu-latest
+    env:
+      CHECKMAKE_VERSION: v0.3.2
+      CHECKMAKE_SHA256: e2effb876913f3ee2caef0ba35f6202c5e8a3cd55a077d8d2b9ce2034257b6af
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install checkmake
+        run: |
+          mkdir -p "$RUNNER_TEMP/checkmake"
+          curl -fsSLo "$RUNNER_TEMP/checkmake/checkmake" \
+            "https://github.com/checkmake/checkmake/releases/download/$CHECKMAKE_VERSION/checkmake-$CHECKMAKE_VERSION.linux.amd64"
+          echo "$CHECKMAKE_SHA256  $RUNNER_TEMP/checkmake/checkmake" | sha256sum -c -
+          chmod +x "$RUNNER_TEMP/checkmake/checkmake"
+          echo "$RUNNER_TEMP/checkmake" >> "$GITHUB_PATH"
+
+      - name: checkmake
+        run: checkmake Makefile
+
+  yaml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Files and rules come from .yamllint.yml.
+      - name: yamllint
+        run: pipx run yamllint==1.38.0 --strict --format github .
+
+  actions:
+    runs-on: ubuntu-latest
+    env:
+      ACTIONLINT_VERSION: 1.7.12
+      ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install actionlint
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/actionlint.tar.gz" \
+            "https://github.com/rhysd/actionlint/releases/download/v$ACTIONLINT_VERSION/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP/actionlint" actionlint
+          echo "$RUNNER_TEMP/actionlint" >> "$GITHUB_PATH"
+
+      - name: Install shellcheck
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/shellcheck.tar.xz" \
+            "https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.x86_64.tar.xz"
+          echo "$SHELLCHECK_SHA256  $RUNNER_TEMP/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/shellcheck.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/shellcheck-v$SHELLCHECK_VERSION" >> "$GITHUB_PATH"
+
+      # Also runs shellcheck over every `run:` block.
+      - name: actionlint
+        run: actionlint
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The runner's own shellcheck is older and reports differently, so both jobs install the pinned one.
+      - name: Install shellcheck
+        run: |
+          curl -fsSLo "$RUNNER_TEMP/shellcheck.tar.xz" \
+            "https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.x86_64.tar.xz"
+          echo "$SHELLCHECK_SHA256  $RUNNER_TEMP/shellcheck.tar.xz" | sha256sum -c -
+          tar -xJf "$RUNNER_TEMP/shellcheck.tar.xz" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/shellcheck-v$SHELLCHECK_VERSION" >> "$GITHUB_PATH"
+
+      - name: shellcheck
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck
+
+  json:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Syntax only: release-please and SwiftPM own the formatting of the files they write.
+      - name: jq
+        run: git ls-files -z '*.json' '*.resolved' | xargs -0 -n1 jq empty

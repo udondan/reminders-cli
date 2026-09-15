@@ -36,7 +36,8 @@ public enum ListingFormat: String, ExpressibleByArgument, CaseIterable {
 struct ListingOptions: ParsableArguments {
     @Option(
         name: .shortAndLong,
-        help: "format, one of 'plain', 'json' or 'pretty' (default: $\(ListingFormat.environmentVariable), else 'plain')")
+        help: ArgumentHelp("format, one of 'plain', 'json' or 'pretty' "
+            + "(default: $\(ListingFormat.environmentVariable), else 'plain')"))
     var format: ListingFormat?
 
     @Flag(name: .shortAndLong, help: "With --format pretty, show the start of each reminder's notes")
@@ -297,7 +298,7 @@ private func header(for group: PrettyGroup, now: Date) -> String {
 /// repeat, flag, notes and ID prefix. Columns are as wide as their widest value across all groups
 /// (titles capped at `maximumTitleWidth`); a column that's empty in every row is left out. With
 /// `verbose` the notes marker is replaced by an excerpt on its own line under the title.
-func formatPretty(
+func formatPretty(  // swiftlint:disable:this function_body_length
     _ groups: [PrettyGroup], now: Date, calendar: Calendar = .current, style: PrettyStyle,
     verbose: Bool
 ) -> [String] {
