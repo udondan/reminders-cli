@@ -53,7 +53,9 @@ if ! created=$(run new-list "$name" --format json 2>new-list.err); then
 fi
 echo "$created"
 list_id=$(jqr .calendarIdentifier <<<"$created")
-[ -n "$list_id" ] && [ "$list_id" != null ] || fail "new-list returned no calendarIdentifier"
+if [ -z "$list_id" ] || [ "$list_id" = null ]; then
+    fail "new-list returned no calendarIdentifier"
+fi
 
 # --- add: due date, notes, priority, weekly repeat --------------------------
 echo "--- add"
