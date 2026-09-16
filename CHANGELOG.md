@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.2](https://github.com/udondan/reminders-cli/compare/v3.5.1...v3.5.2) (2026-09-16)
+
+
+### Bug Fixes
+
+* point the timeIsSignificant warning at this project's issue tracker ([#90](https://github.com/udondan/reminders-cli/issues/90)) ([fc6e263](https://github.com/udondan/reminders-cli/commit/fc6e2634f957105a1ac810556bcb553fc5e7839b))
+
 ## [3.5.1](https://github.com/udondan/reminders-cli/compare/v3.5.0...v3.5.1) (2026-09-16)
 
 
