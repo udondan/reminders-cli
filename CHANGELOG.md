@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.1](https://github.com/udondan/reminders-cli/compare/v3.5.0...v3.5.1) (2026-09-16)
+
+
+### Bug Fixes
+
+* accept values starting with a dash for --notes and --search ([#87](https://github.com/udondan/reminders-cli/issues/87)) ([1af30e1](https://github.com/udondan/reminders-cli/commit/1af30e1ffbb72d8a4961dae131fd95c66d179387)), closes [#86](https://github.com/udondan/reminders-cli/issues/86)
+
 ## [3.5.0](https://github.com/udondan/reminders-cli/compare/v3.4.0...v3.5.0) (2026-09-14)
 
 

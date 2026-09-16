@@ -1,7 +1,7 @@
 {
   "name": "reminders-cli",
   "displayName": "Reminders CLI",
-  "version": "3.5.0",
+  "version": "3.5.1",
   "description": "Read, add, edit, complete and delete macOS Reminders from the command line.",
   "author": {
     "name": "udondan",
