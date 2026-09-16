@@ -1,6 +1,19 @@
 # reminders-cli
 
-A simple CLI for interacting with OS X reminders.
+A CLI for Apple Reminders on macOS: list, add, edit, complete, postpone and delete reminders from
+the terminal or a script, with JSON output and stable reminder IDs.
+
+```console
+brew install udondan/software/reminders-cli
+```
+
+## About this project
+
+This project builds on [keith/reminders-cli](https://github.com/keith/reminders-cli), with thanks to
+Keith Smiley and its contributors for the original work. It adds features such as JSON output with
+structured errors, pretty output, batch operations, repeating reminders, `today`/`overdue`/`upcoming`
+shortcuts, `postpone`, list management and a `doctor` command for access problems. See the
+[changelog](CHANGELOG.md) for details.
 
 ## Usage
 
