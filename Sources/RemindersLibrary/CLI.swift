@@ -88,7 +88,9 @@ private struct ShowAll: FormattedCommand {
     @Option(help: "Only show reminders with this priority; repeat to specify multiple")
     var priority: [Priority] = []
 
-    @Option(help: "Only show reminders whose title or notes contain this text (case-insensitive)")
+    @Option(
+        parsing: .unconditional,
+        help: "Only show reminders whose title or notes contain this text (case-insensitive)")
     var search: String?
 
     @Flag(help: "Only show flagged reminders")
@@ -305,7 +307,9 @@ private struct Show: FormattedCommand {
     @Option(help: "Only show reminders with this priority; repeat to specify multiple")
     var priority: [Priority] = []
 
-    @Option(help: "Only show reminders whose title or notes contain this text (case-insensitive)")
+    @Option(
+        parsing: .unconditional,
+        help: "Only show reminders whose title or notes contain this text (case-insensitive)")
     var search: String?
 
     @Flag(help: "Only show flagged reminders")
@@ -389,6 +393,7 @@ private struct Add: FormattedCommand {
 
     @Option(
         name: .shortAndLong,
+        parsing: .unconditional,
         help: "The notes to add to the reminder")
     var notes: String?
 
@@ -598,6 +603,7 @@ private struct Edit: FormattedCommand {
 
     @Option(
         name: .shortAndLong,
+        parsing: .unconditional,
         help: "The notes to set on the reminder, overwriting previous notes")
     var notes: String?
 

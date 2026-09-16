@@ -48,6 +48,7 @@ final class EditValidationTests: XCTestCase {
         let changes: [[String]] = [
             ["New", "title"],
             ["--notes", "x"],
+            ["--notes", "- [ ] x"],
             ["--due-date", "2026-09-10"],
             ["--clear-due-date"],
             ["--priority", "low"],

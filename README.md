@@ -356,6 +356,23 @@ C4E9F3B2-1A5D-4E8C-9B32-6D7F0A1B2C3D: Go to the grocery store (in 10 hours)
 D5F0A4C3-2B6E-4F9D-AC43-7E8A1B2C3D4E: Something really important (priority: high)
 ```
 
+Reminders has no subtasks, but a Markdown checklist in the notes comes close. `--notes` takes the
+next argument as it is, even when it starts with `-` or spans several lines:
+
+```console
+$ reminders add Soon Migrate repositories --notes "- [ ] repo-a
+- [ ] repo-b"
+Added reminder 'Migrate repositories' to list 'Soon'
+```
+
+The reminder text itself is read from the remaining arguments, so a title that starts with `-`
+would be taken for an option. Put it after `--`, which ends the options:
+
+```console
+$ reminders add Soon --due-date tomorrow -- "- not an option"
+Added reminder '- not an option' to list 'Soon'
+```
+
 ### Add a repeating reminder
 
 ```console
