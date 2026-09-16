@@ -32,7 +32,7 @@ private func components(from string: String) -> DateComponents? {
     if match.responds(to: NSSelectorFromString("timeIsSignificant")) {
         includeTime = match.value(forKey: "timeIsSignificant") as? Bool ?? true
     } else {
-        print("warning: timeIsSignificant is not available, please report this to keith/reminders-cli")
+        print("warning: timeIsSignificant is unavailable, please report it at github.com/udondan/reminders-cli/issues")
     }
 
     var zonedCalendar = calendar
