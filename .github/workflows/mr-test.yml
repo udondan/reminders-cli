@@ -25,12 +25,10 @@ jobs:
             code:
               - Sources/**
               - Tests/**
+              - .github/workflows/mr-test.yml
+              - Makefile
               - Package.swift
               - Package.resolved
-
-      - name: xcode-select
-        if: steps.changes.outputs.code == 'true'
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
       - name: Build
         if: steps.changes.outputs.code == 'true'
@@ -39,6 +37,10 @@ jobs:
       - name: Test
         if: steps.changes.outputs.code == 'true'
         run: swift test -Xswiftc -warnings-as-errors
+
+      - name: Package
+        if: steps.changes.outputs.code == 'true'
+        run: make package
 
   live-test:
     # Exercises the real EventKit store end to end against a throwaway list, covering the store

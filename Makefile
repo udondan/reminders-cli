@@ -1,4 +1,4 @@
-RELEASE_BUILD=./.build/apple/Products/Release
+RELEASE_BUILD=$(shell swift build --configuration release --arch arm64 --arch x86_64 --show-bin-path)
 EXECUTABLE=reminders
 ARCHIVE=$(EXECUTABLE).tar.gz
 
