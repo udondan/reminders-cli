@@ -36,9 +36,6 @@ jobs:
         with:
           ref: ${{ inputs.ref || inputs.tag }}
 
-      - name: xcode-select
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
-
       - name: Package
         run: make package
 
