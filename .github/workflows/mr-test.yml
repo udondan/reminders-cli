@@ -106,3 +106,16 @@ jobs:
 
       - name: Check SKILL.md JSON field table against EncodingKeys
         run: bash .github/scripts/check-skill-json-fields.sh
+
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  # The only test check the ruleset requires, whatever jobs are added later.
+  required:
+    needs: [build, live-test, skill-docs, lint]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check result
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
