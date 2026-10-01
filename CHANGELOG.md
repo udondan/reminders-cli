@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.3](https://github.com/udondan/reminders-cli/compare/v3.5.2...v3.5.3) (2026-09-30)
+
+
+### Dependencies
+
+* **deps:** update dependency macos to v26 ([#95](https://github.com/udondan/reminders-cli/issues/95)) ([d41ca94](https://github.com/udondan/reminders-cli/commit/d41ca9478db7bc07857fcec9ef800d9d545fbe82))
+
 ## [3.5.2](https://github.com/udondan/reminders-cli/compare/v3.5.1...v3.5.2) (2026-09-16)
 
 
