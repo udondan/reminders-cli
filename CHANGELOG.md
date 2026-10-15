@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.5.4](https://github.com/udondan/reminders-cli/compare/v3.5.3...v3.5.4) (2026-10-15)
+
+
+### Dependencies
+
+* **deps:** update jdx/mise-action action to v5.1.2 ([#105](https://github.com/udondan/reminders-cli/issues/105)) ([dc33b41](https://github.com/udondan/reminders-cli/commit/dc33b41fed47e0d81a82d96db472c8d59f012f4a))
+
 ## [3.5.3](https://github.com/udondan/reminders-cli/compare/v3.5.2...v3.5.3) (2026-10-13)
 
 
