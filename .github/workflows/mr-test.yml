@@ -15,6 +15,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -36,7 +37,26 @@ jobs:
 
       - name: Test
         if: steps.changes.outputs.code == 'true'
-        run: swift test -Xswiftc -warnings-as-errors
+        run: swift test -Xswiftc -warnings-as-errors --enable-code-coverage
+
+      - name: Export coverage
+        if: steps.changes.outputs.code == 'true'
+        run: |
+          codecov_dir=$(dirname "$(swift test --show-codecov-path)")
+          bin_path=$(swift build --show-bin-path)
+          bundle=$(find "$bin_path" -maxdepth 1 -name '*.xctest' | head -n 1)
+          xcrun llvm-cov export -format=lcov \
+            -instr-profile "$codecov_dir/default.profdata" \
+            -ignore-filename-regex '\.build/|Tests/' \
+            "$bundle/Contents/MacOS/$(basename "$bundle" .xctest)" > lcov.info
+
+      - name: Upload coverage to Codecov
+        if: steps.changes.outputs.code == 'true'
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          fail_ci_if_error: false
+          files: lcov.info
 
       - name: Package
         if: steps.changes.outputs.code == 'true'
