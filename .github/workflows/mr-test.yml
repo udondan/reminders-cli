@@ -108,7 +108,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-14, macos-15]
+        os: [macos-15, macos-26]
     permissions:
       contents: read
       pull-requests: read
@@ -129,10 +129,6 @@ jobs:
               - .github/workflows/mr-test.yml
               - Package.swift
               - Package.resolved
-
-      - name: xcode-select
-        if: steps.changes.outputs.code == 'true' && matrix.os == 'macos-14'
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
 
       - name: Build
         if: steps.changes.outputs.code == 'true'
