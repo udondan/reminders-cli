@@ -44,7 +44,7 @@ jobs:
   swift:
     # The Linux build of SwiftLint links against libxml2.so.2, which Ubuntu
     # 26.04 (now ubuntu-latest) no longer ships.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     steps:
       - uses: actions/checkout@v7
 
