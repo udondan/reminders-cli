@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.5.5](https://github.com/udondan/reminders-cli/compare/v3.5.4...v3.5.5) (2026-10-30)
+
+
+### Dependencies
+
+* **deps:** update davidanson/markdownlint-cli2-action action to v25 ([#110](https://github.com/udondan/reminders-cli/issues/110)) ([5f2ce8f](https://github.com/udondan/reminders-cli/commit/5f2ce8fe7785be84c6607414612fcf8bd83d30ec))
+* **deps:** update jdx/mise-action action to v5.2.0 ([#107](https://github.com/udondan/reminders-cli/issues/107)) ([e536bd9](https://github.com/udondan/reminders-cli/commit/e536bd996cbdfedddc46790a23088ad4b893f356))
+* **deps:** update jdx/mise-action action to v5.2.4 ([#113](https://github.com/udondan/reminders-cli/issues/113)) ([cf9eed5](https://github.com/udondan/reminders-cli/commit/cf9eed5b8a294e9136fa066c00af95660fba083d))
+
 ## [3.5.4](https://github.com/udondan/reminders-cli/compare/v3.5.3...v3.5.4) (2026-10-15)
 
 
