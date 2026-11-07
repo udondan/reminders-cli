@@ -490,8 +490,8 @@ private func requireIds(_ ids: [String]) throws {
 }
 
 func listNameCompletion(_ arguments: [String], _ position: Int, _ prefix: String) -> [String] {
-    // zsh splits a completion at an unescaped ":", so list names escape it. Other characters or shells
-    // may need the same treatment.
+    // NOTE(#126): A list name with ':' was separated in zsh completion, there might be more of these or
+    // this might break other shells
     return reminders.getListNames().map { $0.replacingOccurrences(of: ":", with: "\\:") }
 }
 

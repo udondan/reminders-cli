@@ -29,7 +29,7 @@ final class NaturalLanguageTests: XCTestCase {
     }
 
     func testTonight() throws {
-        // The exact hour NSDataDetector picks for "tonight" is an OS/locale-dependent
+        // NOTE: The exact hour NSDataDetector picks for "tonight" is an OS/locale-dependent
         // implementation detail (it has changed between macOS versions), so only assert it
         // resolves to today, in the evening, on the hour.
         let components = try XCTUnwrap(DateComponents(argument: "tonight"))
@@ -94,7 +94,7 @@ final class NaturalLanguageTests: XCTestCase {
 
     // FB8921206
     func testNextWeekend() throws {
-        // NSDataDetector doesn't parse "next weekend" yet; once it does, assert the date below instead.
+        // TODO(#125): This should be inverted but DataDetector doesn't support it right now
         XCTAssertNil(DateComponents(argument: "next weekend"))
         // let components = try XCTUnwrap(DateComponents(argument: "next weekend"))
         // let date = try XCTUnwrap(Calendar.current.date(from: components))

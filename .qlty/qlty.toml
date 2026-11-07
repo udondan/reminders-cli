@@ -85,9 +85,41 @@ name = "gitleaks"
 [[plugin]]
 name = "trufflehog"
 
+# TODO/NOTE/FIXME comments, so every open one is tracked in an issue and triaged below
+[[plugin]]
+name = "ripgrep"
+
 # The tag and ref inputs of the manual dispatch are the documented way to re-run a
 # failed publish of a draft release (see "Release process" in CLAUDE.md).
 [[triage]]
 match.rules = ["checkov:CKV_GHA_7"]
 match.file_patterns = [".github/workflows/publish.yml"]
+set.ignored = true
+
+# Known TODO, tracked in https://github.com/udondan/reminders-cli/issues/124
+# (CustomSortOrder until macOS 12 is the minimum). Remove this entry with the TODO.
+[[triage]]
+match.rules = ["ripgrep:TODO"]
+match.file_patterns = ["Sources/RemindersLibrary/Sort.swift"]
+set.ignored = true
+
+# Known TODO, tracked in https://github.com/udondan/reminders-cli/issues/125
+# ("next weekend" doesn't parse). Remove this entry with the TODO.
+[[triage]]
+match.rules = ["ripgrep:TODO"]
+match.file_patterns = ["Tests/RemindersTests/NaturalLanguageTests.swift"]
+set.ignored = true
+
+# Known issue, tracked in https://github.com/udondan/reminders-cli/issues/126
+# (list name completion escaping). Remove this entry with the NOTE.
+[[triage]]
+match.rules = ["ripgrep:NOTE"]
+match.file_patterns = ["Sources/RemindersLibrary/CLI.swift"]
+set.ignored = true
+
+# The NOTE in testTonight explains why the test only asserts "evening, on the hour"; it's not an
+# open task.
+[[triage]]
+match.rules = ["ripgrep:NOTE"]
+match.file_patterns = ["Tests/RemindersTests/NaturalLanguageTests.swift"]
 set.ignored = true
