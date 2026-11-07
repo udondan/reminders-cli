@@ -134,8 +134,7 @@ To move a repeating reminder forward without changing its rule, use `postpone`.
 - `12:00`, `tomorrow 9pm`, `on monday at 9pm`
 - `in 2 days`, `in 7 days`
 - `next monday`, `next saturday`
+- `this weekend`, `next weekend` (the first day of the weekend, or today during a weekend for `this weekend`)
 - ISO dates such as `2026-09-01`
-
-Known limitation: `next weekend` does not parse (Apple Feedback FB8921206). Use a concrete weekday instead.
 
 A date without a time covers the whole local day for `--due-before` and `--repeat-until`. `--due-after` uses the parsed date's start as an inclusive lower bound. An unparseable date is a usage error (exit status 64). Prefer ISO dates when you already know the exact day.

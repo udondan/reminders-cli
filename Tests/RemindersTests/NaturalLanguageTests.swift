@@ -92,14 +92,53 @@ final class NaturalLanguageTests: XCTestCase {
         try assertUpcoming("next saturday", weekday: 7)
     }
 
-    // FB8921206
     func testNextWeekend() throws {
-        // TODO(#125): This should be inverted but DataDetector doesn't support it right now
-        XCTAssertNil(DateComponents(argument: "next weekend"))
-        // let components = try XCTUnwrap(DateComponents(argument: "next weekend"))
-        // let date = try XCTUnwrap(Calendar.current.date(from: components))
+        let components = try XCTUnwrap(DateComponents(argument: "next weekend"))
+        let date = try XCTUnwrap(Calendar.current.date(from: components))
 
-        // XCTAssertTrue(Calendar.current.isDateInWeekend(date))
+        XCTAssertTrue(Calendar.current.isDateInWeekend(date))
+        XCTAssertGreaterThan(date, Date())
+        XCTAssertNil(components.hour)
+    }
+
+    /// A Gregorian calendar with a Saturday/Sunday weekend in a fixed time zone, so the weekend
+    /// tests don't depend on the machine's locale or time zone.
+    private var fixedCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = Locale(identifier: "en_US")
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? calendar.timeZone
+        return calendar
+    }
+
+    private func weekendDay(_ phrase: String, now: String) throws -> String {
+        let calendar = fixedCalendar
+        let formatter = ISO8601DateFormatter()
+        let nowDate = try XCTUnwrap(formatter.date(from: now))
+        let components = try XCTUnwrap(weekendComponents(from: phrase, now: nowDate, calendar: calendar), phrase)
+        XCTAssertNil(components.hour, phrase)
+        let date = try XCTUnwrap(calendar.date(from: components))
+        formatter.formatOptions = [.withFullDate]
+        return formatter.string(from: date)
+    }
+
+    func testWeekendFromWeekday() throws {
+        // Wednesday 2026-11-04: all three phrases mean the coming Saturday.
+        let now = "2026-11-04T10:00:00Z"
+        XCTAssertEqual(try weekendDay("weekend", now: now), "2026-11-07")
+        XCTAssertEqual(try weekendDay("this weekend", now: now), "2026-11-07")
+        XCTAssertEqual(try weekendDay("next weekend", now: now), "2026-11-07")
+    }
+
+    func testWeekendDuringWeekend() throws {
+        // Sunday 2026-11-08: "this weekend" is today, "next weekend" the following Saturday.
+        let now = "2026-11-08T10:00:00Z"
+        XCTAssertEqual(try weekendDay("this weekend", now: now), "2026-11-08")
+        XCTAssertEqual(try weekendDay("Next  Weekend", now: now), "2026-11-14")
+    }
+
+    func testWeekendIgnoresOtherPhrases() {
+        XCTAssertNil(weekendComponents(from: "last weekend"))
+        XCTAssertNil(weekendComponents(from: "weekends"))
     }
 
     func testSpecificDays() throws {

@@ -103,13 +103,6 @@ match.rules = ["ripgrep:TODO"]
 match.file_patterns = ["Sources/RemindersLibrary/Sort.swift"]
 set.ignored = true
 
-# Known TODO, tracked in https://github.com/udondan/reminders-cli/issues/125
-# ("next weekend" doesn't parse). Remove this entry with the TODO.
-[[triage]]
-match.rules = ["ripgrep:TODO"]
-match.file_patterns = ["Tests/RemindersTests/NaturalLanguageTests.swift"]
-set.ignored = true
-
 # Known issue, tracked in https://github.com/udondan/reminders-cli/issues/126
 # (list name completion escaping). Remove this entry with the NOTE.
 [[triage]]
