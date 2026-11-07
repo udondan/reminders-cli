@@ -1,4 +1,12 @@
-# reminders-cli
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/banner-dark.webp">
+  <img alt="reminders-cli: Apple Reminders. In your terminal." src="docs/banner-light.webp">
+</picture>
+
+[![Release](https://img.shields.io/github/v/release/udondan/reminders-cli)][latest]
+[![Homebrew](https://img.shields.io/badge/homebrew-udondan%2Fsoftware%2Freminders--cli-orange)][tap]
+[![CI](https://github.com/udondan/reminders-cli/actions/workflows/mr-test.yml/badge.svg?branch=main)][ci]
+[![License](https://img.shields.io/github/license/udondan/reminders-cli)][license]
 
 A CLI for Apple Reminders on macOS: list, add, edit, complete, postpone and delete reminders from
 the terminal or a script, with JSON output and stable reminder IDs.
@@ -745,3 +753,8 @@ Install the Claude Code plugin with `claude plugin marketplace add udondan/skill
 `claude plugin install reminders-cli@udondan`. Other agent frameworks can load the skill file
 directly from [skills/reminders-cli/SKILL.md](skills/reminders-cli/SKILL.md). Agents should always
 pass `--format json` and act on reminders by their stable ID, never by title.
+
+[latest]: https://github.com/udondan/reminders-cli/releases/latest
+[tap]: https://github.com/udondan/homebrew-software
+[ci]: https://github.com/udondan/reminders-cli/actions/workflows/mr-test.yml
+[license]: https://github.com/udondan/reminders-cli/blob/main/LICENSE
