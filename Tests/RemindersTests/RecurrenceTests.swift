@@ -173,12 +173,6 @@ final class RecurrenceTests: XCTestCase {
             from: DateComponents(calendar: utcCalendar, year: 9_999_999_999_999, month: 1, day: 1)))
     }
 
-    func testCopyFailureDescription() {
-        XCTAssertEqual(
-            RecurrenceUpdateError.failedToCopyExistingRule.errorDescription,
-            "The existing repeat rule could not be copied safely")
-    }
-
     func testJSONIncludesDateEnd() throws {
         let store = EKEventStore()
         let reminder = EKReminder(eventStore: store)

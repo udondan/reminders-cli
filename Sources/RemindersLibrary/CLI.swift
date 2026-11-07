@@ -696,20 +696,14 @@ private struct Postpone: FormattedCommand {
     var format: OutputFormat = .plain
 
     func validate() throws {
-        if self.date != nil && self.nextWeekday {
-            throw ValidationError("Cannot specify both a new due date and --next-weekday")
-        }
-        if self.date == nil && !self.nextWeekday {
-            throw ValidationError("Must specify either a new due date or --next-weekday")
-        }
+        _ = try PostponeTarget(date: self.date, nextWeekday: self.nextWeekday)
     }
 
     func run() throws {
         try reminders.postpone(
             items: ReminderSelection(arguments: [self.id]),
             onListNamedOrId: self.listNameOrId,
-            to: self.date,
-            toNextWeekday: self.nextWeekday,
+            to: PostponeTarget(date: self.date, nextWeekday: self.nextWeekday),
             outputFormat: format
         )
     }
