@@ -20,6 +20,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Besides `-warnings-as-errors` on both library targets (applied in `Package.swift` and again explicitly in CI), `.github/workflows/lint.yml` lints every file type in one job per linter, all blocking: Swift with SwiftLint (`.swiftlint.yml`), Markdown with markdownlint-cli2 (`.markdownlint-cli2.yaml`) and its links with lychee (`lychee.toml`), the `Makefile` with checkmake, YAML with yamllint (`.yamllint.yml`), workflows with actionlint, shell scripts with shellcheck, and JSON syntax with jq. `CHANGELOG.md` is excluded, since release-please generates it. The linters' versions are in `mise.toml`, where Renovate updates them. Fix a finding rather than disabling its rule; a rule is only disabled or tuned in the config where it conflicts with a deliberate project pattern, with the reason next to it, and a single exception is a `// swiftlint:disable:next <rule>` with a comment saying why.
 
+Coverage on Codecov combines two sources: the unit tests, and an instrumented build that the `live-test` job in `.github/workflows/mr-test.yml` runs through `.github/scripts/live-test/live-test.sh` against a real store on a runner. The `upload-coverage` job merges both into one upload, so code that needs the EventKit store (the `Reminders` methods and the subcommands' `run()`) is covered by extending `live-test.sh` on its throwaway lists, not by unit tests.
+
 ## Architecture
 
 Execution flows in one direction through four layers:

@@ -15,7 +15,6 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
-      id-token: write
     outputs:
       code: ${{ steps.changes.outputs.code }}
     steps:
@@ -28,6 +27,7 @@ jobs:
             code:
               - Sources/**
               - Tests/**
+              - .github/scripts/live-test/**
               - .github/workflows/mr-test.yml
               - Makefile
               - Package.swift
@@ -50,19 +50,52 @@ jobs:
           xcrun llvm-cov export -format=lcov \
             -instr-profile "$codecov_dir/default.profdata" \
             -ignore-filename-regex '\.build/|Tests/' \
-            "$bundle/Contents/MacOS/$(basename "$bundle" .xctest)" > lcov.info
+            "$bundle/Contents/MacOS/$(basename "$bundle" .xctest)" \
+            | sed "s|^SF:$GITHUB_WORKSPACE/|SF:|" > lcov-unit.info
 
-      - name: Upload coverage to Codecov
+      - name: Keep coverage for the upload job
         if: steps.changes.outputs.code == 'true'
-        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        uses: actions/upload-artifact@v7
         with:
-          use_oidc: true
-          fail_ci_if_error: false
-          files: lcov.info
+          name: coverage-unit
+          path: lcov-unit.info
+          if-no-files-found: error
 
       - name: Package
         if: steps.changes.outputs.code == 'true'
         run: make package
+
+  # The unit tests can't reach the EventKit store I/O; the live test runs it. Both coverage reports
+  # go to Codecov in one upload, so Codecov computes its status once, from the merged data.
+  upload-coverage:
+    runs-on: ubuntu-latest
+    needs: [build, live-test]
+    if: always() && needs.build.result == 'success' && needs.build.outputs.code == 'true'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: List coverage reports
+        id: files
+        run: |
+          files=$(find . -maxdepth 1 -name 'lcov-*.info' | sort | paste -sd, -)
+          echo "Coverage reports: $files"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          fail_ci_if_error: false
+          disable_search: true
+          files: ${{ steps.files.outputs.files }}
 
   # Codecov reports its result as the check runs codecov/project and
   # codecov/patch. This job waits for them, so a coverage drop fails the
@@ -71,8 +104,8 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    needs: [build]
-    if: github.event_name == 'pull_request' && needs.build.result == 'success' && needs.build.outputs.code == 'true'
+    needs: [build, upload-coverage]
+    if: always() && github.event_name == 'pull_request' && needs.upload-coverage.result == 'success'
     timeout-minutes: 10
     permissions:
       checks: read
@@ -104,6 +137,8 @@ jobs:
     # Exercises the real EventKit store end to end against a throwaway list, covering the store
     # I/O the unit tests can't reach (fetch, save, commit, create and delete lists). It only works
     # because hosted runners disable SIP, which lets us grant Reminders access without the prompt.
+    # The binary is built with coverage instrumentation, and its coverage is uploaded together
+    # with the unit tests' by upload-coverage.
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -116,6 +151,8 @@ jobs:
       # The test asserts exact UTC due dates from timezone-free date strings, so pin the runner's
       # timezone rather than depend on it defaulting to UTC.
       TZ: UTC
+      # %p: one profile per process, merged after the test.
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/.build/live-coverage/%p.profraw
     steps:
       - uses: actions/checkout@v7
 
@@ -125,14 +162,17 @@ jobs:
           filters: |
             code:
               - Sources/**
+              - Tests/**
               - .github/scripts/live-test/**
               - .github/workflows/mr-test.yml
+              - Makefile
               - Package.swift
               - Package.resolved
 
       - name: Build
         if: steps.changes.outputs.code == 'true'
-        run: swift build
+        # The flags --enable-code-coverage adds to `swift test`.
+        run: swift build -Xswiftc -profile-generate -Xswiftc -profile-coverage-mapping
 
       - name: Grant Reminders access
         if: steps.changes.outputs.code == 'true'
@@ -151,6 +191,25 @@ jobs:
           fi
           exit $code
 
+      # Also after a failed test, so the coverage of what did run still counts.
+      - name: Export coverage
+        if: always() && steps.changes.outputs.code == 'true'
+        run: |
+          xcrun llvm-profdata merge -sparse .build/live-coverage/*.profraw -o live.profdata
+          xcrun llvm-cov export -format=lcov \
+            -instr-profile live.profdata \
+            -ignore-filename-regex '\.build/|Tests/' \
+            .build/debug/reminders \
+            | sed "s|^SF:$GITHUB_WORKSPACE/|SF:|" > "lcov-live-${{ matrix.os }}.info"
+
+      - name: Keep coverage for the upload job
+        if: always() && steps.changes.outputs.code == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-live-${{ matrix.os }}
+          path: lcov-live-${{ matrix.os }}.info
+          if-no-files-found: error
+
   skill-docs:
     runs-on: ubuntu-latest
     permissions:
@@ -168,7 +227,7 @@ jobs:
 
   # The only test check the ruleset requires, whatever jobs are added later.
   required:
-    needs: [build, coverage, live-test, skill-docs, lint]
+    needs: [build, upload-coverage, coverage, live-test, skill-docs, lint]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}

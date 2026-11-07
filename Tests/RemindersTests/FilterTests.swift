@@ -182,6 +182,10 @@ final class FilterTests: XCTestCase {
 
     func testFlaggedRejectsReminderWithoutReadableFlag() throws {
         XCTAssertFalse(matches(makeReminder(), flagged: true))
+        // Without an injected reader, the default reads the real (always unset) flag too.
+        XCTAssertFalse(matchesAdditionalFilters(
+            makeReminder(), now: Date(), overdue: false, dueBefore: nil, dueAfter: nil, noDueDate: false,
+            priorities: [], search: nil, flagged: true))
     }
 
     func testNoFlaggedFilterMatchesUnflaggedReminder() throws {

@@ -162,6 +162,23 @@ final class RecurrenceTests: XCTestCase {
         XCTAssertEqual(resolved.second, 59)
     }
 
+    func testTimedEndIsKeptAsIs() throws {
+        let components = DateComponents(
+            calendar: utcCalendar, timeZone: utcCalendar.timeZone, year: 2026, month: 9, day: 10, hour: 8)
+        XCTAssertEqual(recurrenceEndDate(from: components), utcDate(2026, 9, 10, 8))
+    }
+
+    func testEndBeyondTheCalendarRangeHasNoDate() {
+        XCTAssertNil(recurrenceEndDate(
+            from: DateComponents(calendar: utcCalendar, year: 9_999_999_999_999, month: 1, day: 1)))
+    }
+
+    func testCopyFailureDescription() {
+        XCTAssertEqual(
+            RecurrenceUpdateError.failedToCopyExistingRule.errorDescription,
+            "The existing repeat rule could not be copied safely")
+    }
+
     func testJSONIncludesDateEnd() throws {
         let store = EKEventStore()
         let reminder = EKReminder(eventStore: store)
@@ -585,6 +602,36 @@ final class RecurrenceTests: XCTestCase {
         XCTAssertEqual(
             nextOccurrence(of: rule, anchoredAt: anchor, onOrAfter: reference, calendar: utcCalendar),
             utcDate(2026, 1, 18, 9))
+    }
+
+    func testNextOccurrenceIsUnknownForAComplexRule() {
+        // "The 15th of every month" was made in another app; the CLI doesn't guess it.
+        let rule = EKRecurrenceRule(
+            recurrenceWith: .monthly, interval: 1, daysOfTheWeek: nil, daysOfTheMonth: [15],
+            monthsOfTheYear: nil, weeksOfTheYear: nil, daysOfTheYear: nil, setPositions: nil, end: nil)
+        XCTAssertNil(nextOccurrence(
+            of: rule, anchoredAt: utcDate(2026, 1, 15), onOrAfter: utcDate(2026, 3, 1), calendar: utcCalendar))
+    }
+
+    func testNextOccurrenceGivesUpAfterTheStepLimit() {
+        // Over 10,000 daily steps between the anchor and the reference date.
+        let rule = Recurrence.daily.recurrenceRule(interval: 1, end: nil)
+        XCTAssertNil(nextOccurrence(
+            of: rule, anchoredAt: utcDate(1990, 1, 1), onOrAfter: utcDate(2026, 1, 1), calendar: utcCalendar))
+    }
+
+    func testNextWeekdayOccurrenceEndsAtTheRepeatEnd() throws {
+        // Mon 5th and Wed 7th are within the end, the next Monday isn't.
+        let rule = try weeklyRule(on: "mon,wed", end: EKRecurrenceEnd(end: utcDate(2026, 1, 10)))
+        XCTAssertNil(nextOccurrence(
+            of: rule, anchoredAt: utcDate(2026, 1, 5, 9), onOrAfter: utcDate(2026, 3, 1), calendar: utcCalendar))
+    }
+
+    func testNextWeekdayOccurrenceGivesUpAfterTheStepLimit() throws {
+        // Over 70,000 days between the anchor and the reference date.
+        let rule = try weeklyRule(on: "mon")
+        XCTAssertNil(nextOccurrence(
+            of: rule, anchoredAt: utcDate(1800, 1, 6), onOrAfter: utcDate(2026, 1, 1), calendar: utcCalendar))
     }
 
     /// EventKit sets a new rule's `firstDayOfTheWeek` from the machine's locale and has no public

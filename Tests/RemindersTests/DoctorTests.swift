@@ -244,4 +244,24 @@ final class DoctorTests: XCTestCase {
             findParentProcess(startingAt: 5, executablePath: { _ in "/bin/sh" }, parentOf: { $0 == 5 ? 6 : 5 }),
             ParentProcess(name: "sh", isApplication: false))
     }
+
+    func testFindParentProcessStopsWhenTheParentIsUnknown() {
+        XCTAssertEqual(
+            findParentProcess(startingAt: 300, executablePath: { _ in "/bin/zsh" }, parentOf: { _ in nil }),
+            ParentProcess(name: "zsh", isApplication: false))
+    }
+
+    // The lookups `doctor` runs on the real process and system. They read no reminder data.
+
+    func testDetectParentProcessFindsTheTestRunnersParent() {
+        XCTAssertNotNil(detectParentProcess())
+    }
+
+    func testMacOSBuildNumberIsReadFromTheKernel() throws {
+        XCTAssertFalse(try XCTUnwrap(macOSBuildNumber()).isEmpty)
+    }
+
+    func testCurrentExecutablePathIsAbsolute() {
+        XCTAssertTrue(currentExecutablePath().hasPrefix("/"))
+    }
 }

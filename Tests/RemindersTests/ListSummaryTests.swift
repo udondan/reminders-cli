@@ -78,6 +78,14 @@ final class ListSummaryTests: XCTestCase {
         XCTAssertEqual(summaries, [summary("Known", id: known.calendarIdentifier)])
     }
 
+    func testRemindersWithoutAListAreIgnored() throws {
+        let known = makeCalendar(title: "Known")
+        let orphan = EKReminder(eventStore: store)
+        orphan.title = "Test"
+        let summaries = summarizeLists([known], reminders: [orphan], now: Date(), includeCompleted: false)
+        XCTAssertEqual(summaries, [summary("Known", id: known.calendarIdentifier)])
+    }
+
     func testDueExactlyNowIsNotOverdue() throws {
         let now = wholeSecond()
         let list = makeCalendar(title: "List")
