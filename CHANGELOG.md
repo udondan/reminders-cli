@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.5.6](https://github.com/udondan/reminders-cli/compare/v3.5.5...v3.5.6) (2026-11-07)
+
+
+### Bug Fixes
+
+* parse "this weekend" and "next weekend" as due dates ([#128](https://github.com/udondan/reminders-cli/issues/128)) ([a211fd2](https://github.com/udondan/reminders-cli/commit/a211fd23da8e6d40ae90f0e2815f9337855db682)), closes [#125](https://github.com/udondan/reminders-cli/issues/125)
+
+
+### Dependencies
+
+* **deps:** update jdx/mise-action action to v5.2.5 ([#116](https://github.com/udondan/reminders-cli/issues/116)) ([8bf57ce](https://github.com/udondan/reminders-cli/commit/8bf57ce5ffc6406121786d116f9d286bf0255ba2))
+* **deps:** update jdx/mise-action action to v5.2.6 ([#118](https://github.com/udondan/reminders-cli/issues/118)) ([7f95f96](https://github.com/udondan/reminders-cli/commit/7f95f9640ddadd0a6d0102992cd95365103113ff))
+
 ## [3.5.5](https://github.com/udondan/reminders-cli/compare/v3.5.4...v3.5.5) (2026-10-30)
 
 
