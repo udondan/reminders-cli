@@ -52,7 +52,7 @@ private func dueDateComparison(
     }
 }
 
-// TODO: Replace with SortOrder when we drop < macOS 12.0
+// Foundation's SortOrder can replace this once the minimum macOS version is 12.
 public enum CustomSortOrder: String, Decodable, ExpressibleByArgument, CaseIterable {
     case ascending
     case descending

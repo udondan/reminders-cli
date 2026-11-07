@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       # Files and rules come from .markdownlint-cli2.yaml, whose globs add to the action's default of the root files.
       - uses: DavidAnson/markdownlint-cli2-action@696eb3f2509270d7b882d2aa68347bc676e7af34 # v25.0.0
@@ -23,6 +25,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Restore lychee cache
         uses: actions/cache@v6
@@ -47,6 +51,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
@@ -59,6 +65,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
@@ -71,6 +79,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
@@ -84,6 +94,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
@@ -97,6 +109,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
         with:
@@ -109,7 +123,43 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       # Syntax only: release-please and SwiftPM own the formatting of the files they write.
       - name: jq
         run: git ls-files -z '*.json' '*.resolved' | xargs -0 -n1 jq empty
+
+  # The security plugins of .qlty/qlty.toml, and code smells (complexity, duplication). Git-aware: only smells
+  # introduced by the PR compared to main fail the job.
+  qlty:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install qlty
+        uses: qltysh/qlty-action/install@ebcd284bf32e36a030afe15f1e136c7be08b9506 # v2.5.0
+
+      - name: Lint via qlty plugins
+        run: qlty check --all
+
+      - name: Report code smells
+        if: github.event_name != 'pull_request'
+        run: qlty smells --all --no-snippets
+
+      - name: Report new code smells
+        if: github.event_name == 'pull_request'
+        run: qlty smells --upstream origin/main --no-snippets
+
+      - name: Fail on new code smells
+        if: github.event_name == 'pull_request'
+        run: |
+          count=$(qlty smells --upstream origin/main --json --quiet 2>/dev/null | jq length)
+          if [ "$count" -gt 0 ]; then
+            echo "::error::qlty found $count new code smell(s) compared to main"
+            exit 1
+          fi

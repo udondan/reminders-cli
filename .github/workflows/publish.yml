@@ -12,6 +12,13 @@ on:
         description: Commit to build
         type: string
         required: true
+    secrets:
+      OVERRIDE_TOKEN:
+        description: Token for the release and the push to the Homebrew tap
+        required: true
+      EMAIL:
+        description: Commit email for the Homebrew tap
+        required: true
   workflow_dispatch:
     inputs:
       tag:
@@ -35,6 +42,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref || inputs.tag }}
+          persist-credentials: false
 
       - name: Package
         run: make package
@@ -75,13 +83,14 @@ jobs:
           repository: udondan/homebrew-software
           token: ${{ secrets.OVERRIDE_TOKEN }}
           path: homebrew-software
+          # The formula update below pushes with these credentials.
+          persist-credentials: true
 
       - name: Update homebrew formula
         if: inputs.tag != ''
         working-directory: homebrew-software
         run: |
           VERSION="${TAG}"
-          SHA256="${{ steps.checksum.outputs.sha256 }}"
 
           echo "${TEMPLATE}" | sed \
             -e "s!{{ version }}!${VERSION#v}!g" \
@@ -96,6 +105,7 @@ jobs:
           git push
         env:
           TAG: ${{ inputs.tag }}
+          SHA256: ${{ steps.checksum.outputs.sha256 }}
           EMAIL: ${{ secrets.EMAIL }}
           TEMPLATE: |
             class RemindersCli < Formula

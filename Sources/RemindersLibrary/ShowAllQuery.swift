@@ -14,6 +14,13 @@ struct ShowAllQuery: Equatable {
     var sort: Sort = .dueDate
     var sortOrder: CustomSortOrder = .ascending
 
+    /// The query's filters, over incomplete reminders only.
+    var filter: ReminderFilter {
+        ReminderFilter(
+            dueOn: dueOn, includeOverdue: includeOverdue, overdue: overdue, dueBefore: dueBefore,
+            dueAfter: dueAfter, displayOptions: .incomplete, sort: sort, sortOrder: sortOrder)
+    }
+
     /// `show-all --due-date today --include-overdue --sort due-date`.
     static func today(
         includeOverdue: Bool = true, lists: [String] = [], sort: Sort = .dueDate,

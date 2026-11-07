@@ -44,11 +44,8 @@ private let nextDueDateDiscussion = """
     itself. Omitted for completed reminders and for repeat rules this CLI can't compute.
     """
 
-private struct ShowAll: FormattedCommand {
-    static let configuration = CommandConfiguration(
-        abstract: "Print all reminders",
-        discussion: nextDueDateDiscussion)
-
+/// The filter and sort options `show` and `show-all` share.
+private struct ReminderFilterOptions: ParsableArguments {
     @Flag(help: "Show completed items only")
     var onlyCompleted = false
 
@@ -96,18 +93,8 @@ private struct ShowAll: FormattedCommand {
     @Flag(help: "Only show flagged reminders")
     var flagged = false
 
-    @Option(help: "Only show reminders from this list (name, unique part of a name, or ID); repeat to specify multiple")
-    var list: [String] = []
-
     @Option(help: "Only show completed reminders completed on or after this date")
     var completedSince: DateComponents?
-
-    @OptionGroup
-    var listing: ListingOptions
-
-    var format: OutputFormat {
-        listing.errorFormat
-    }
 
     func validate() throws {
         if self.onlyCompleted && self.includeCompleted {
@@ -128,21 +115,43 @@ private struct ShowAll: FormattedCommand {
         }
     }
 
-    func run() throws {
+    var filter: ReminderFilter {
         var displayOptions = DisplayOptions.incomplete
         if self.onlyCompleted {
             displayOptions = .complete
         } else if self.includeCompleted {
             displayOptions = .all
         }
+        return ReminderFilter(
+            dueOn: dueDate, includeOverdue: includeOverdue, overdue: overdue, dueBefore: dueBefore,
+            dueAfter: dueAfter, noDueDate: noDueDate, priorities: priority, search: search,
+            completedSince: completedSince, flagged: flagged, displayOptions: displayOptions, sort: sort,
+            sortOrder: sortOrder)
+    }
+}
 
+private struct ShowAll: FormattedCommand {
+    static let configuration = CommandConfiguration(
+        abstract: "Print all reminders",
+        discussion: nextDueDateDiscussion)
+
+    @OptionGroup
+    var filters: ReminderFilterOptions
+
+    @Option(help: "Only show reminders from this list (name, unique part of a name, or ID); repeat to specify multiple")
+    var list: [String] = []
+
+    @OptionGroup
+    var listing: ListingOptions
+
+    var format: OutputFormat {
+        listing.errorFormat
+    }
+
+    func run() throws {
         try reminders.showAllReminders(
-            dueOn: self.dueDate, includeOverdue: self.includeOverdue,
-            overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
-            noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
-            lists: self.list, completedSince: self.completedSince, flagged: self.flagged,
-            displayOptions: displayOptions, outputFormat: listing.resolvedFormat, verbose: listing.verbose,
-            sort: sort, sortOrder: sortOrder)
+            lists: self.list, filter: filters.filter, outputFormat: listing.resolvedFormat,
+            verbose: listing.verbose)
     }
 }
 
@@ -268,55 +277,8 @@ private struct Show: FormattedCommand {
         completion: .custom(listNameCompletion))
     var listNameOrId: String
 
-    @Flag(help: "Show completed items only")
-    var onlyCompleted = false
-
-    @Flag(help: "Include completed items in output")
-    var includeCompleted = false
-
-    @Flag(help: "When using --due-date, also include items due before the due date")
-    var includeOverdue = false
-
-    @Option(
-        name: .shortAndLong,
-        help: "Show the reminders in a specific order, one of: \(Sort.commaSeparatedCases)")
-    var sort: Sort = .none
-
-    @Option(
-        name: [.customShort("o"), .long],
-        help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
-    var sortOrder: CustomSortOrder = .ascending
-
-    @Option(
-        name: .shortAndLong,
-        help: "Show only reminders due on this date")
-    var dueDate: DateComponents?
-
-    @Flag(help: "Only show reminders with a due date in the past")
-    var overdue = false
-
-    @Option(help: "Only show reminders due on or before this date")
-    var dueBefore: DateComponents?
-
-    @Option(help: "Only show reminders due on or after this date")
-    var dueAfter: DateComponents?
-
-    @Flag(help: "Only show reminders with no due date")
-    var noDueDate = false
-
-    @Option(help: "Only show reminders with this priority; repeat to specify multiple")
-    var priority: [Priority] = []
-
-    @Option(
-        parsing: .unconditional,
-        help: "Only show reminders whose title or notes contain this text (case-insensitive)")
-    var search: String?
-
-    @Flag(help: "Only show flagged reminders")
-    var flagged = false
-
-    @Option(help: "Only show completed reminders completed on or after this date")
-    var completedSince: DateComponents?
+    @OptionGroup
+    var filters: ReminderFilterOptions
 
     @OptionGroup
     var listing: ListingOptions
@@ -325,40 +287,10 @@ private struct Show: FormattedCommand {
         listing.errorFormat
     }
 
-    func validate() throws {
-        if self.onlyCompleted && self.includeCompleted {
-            throw ValidationError(
-                "Cannot specify both --include-completed and --only-completed")
-        }
-        if self.noDueDate
-            && (self.dueDate != nil || self.dueBefore != nil || self.dueAfter != nil
-                || self.overdue || self.includeOverdue)
-        {
-            throw ValidationError(
-                "Cannot combine --no-due-date with --due-date, --due-before, --due-after, --overdue, "
-                    + "or --include-overdue")
-        }
-        if self.completedSince != nil && !self.onlyCompleted && !self.includeCompleted {
-            throw ValidationError(
-                "--completed-since requires --only-completed or --include-completed")
-        }
-    }
-
     func run() throws {
-        var displayOptions = DisplayOptions.incomplete
-        if self.onlyCompleted {
-            displayOptions = .complete
-        } else if self.includeCompleted {
-            displayOptions = .all
-        }
-
         try reminders.showListItems(
-            withNameOrId: self.listNameOrId, dueOn: self.dueDate, includeOverdue: self.includeOverdue,
-            overdue: self.overdue, dueBefore: self.dueBefore, dueAfter: self.dueAfter,
-            noDueDate: self.noDueDate, priorities: self.priority, search: self.search,
-            completedSince: self.completedSince, flagged: self.flagged,
-            displayOptions: displayOptions, outputFormat: listing.resolvedFormat, verbose: listing.verbose,
-            sort: sort, sortOrder: sortOrder)
+            withNameOrId: self.listNameOrId, filter: filters.filter, outputFormat: listing.resolvedFormat,
+            verbose: listing.verbose)
     }
 }
 
@@ -468,47 +400,37 @@ private struct Add: FormattedCommand {
     }
 }
 
-private struct Complete: FormattedCommand {
-    static let configuration = CommandConfiguration(
-        abstract: "Complete a reminder")
-
-    @Argument(
-        help: "The list to complete a reminder on: a name, a unique part of a name, or an ID from 'show-lists'",
-        completion: .custom(listNameCompletion))
-    var listNameOrId: String
-
-    @Argument(
-        help: ArgumentHelp("The ids of the reminders to complete, or unique prefixes of at least 4 characters, "
-            + "see 'show' for IDs; \(batchIdsHelp)"))
-    var ids: [String] = []
-
-    @Option(
-        name: .shortAndLong,
-        help: "Output format (plain or json)")
-    var format: OutputFormat = .plain
-
-    func validate() throws {
-        try requireIds(ids)
-    }
-
-    func run() throws {
-        try reminders.setComplete(true, items: ReminderSelection(arguments: self.ids),
-                            onListNamedOrId: self.listNameOrId,
-                            outputFormat: format)
-    }
+/// What `SetCompletion` sets: `complete` or `uncomplete`, also the command name.
+private protocol CompletionMode {
+    static var verb: String { get }
+    static var isCompleted: Bool { get }
 }
 
-private struct Uncomplete: FormattedCommand {
-    static let configuration = CommandConfiguration(
-        abstract: "Uncomplete a reminder")
+private enum CompleteMode: CompletionMode {
+    static let verb = "complete"
+    static let isCompleted = true
+}
+
+private enum UncompleteMode: CompletionMode {
+    static let verb = "uncomplete"
+    static let isCompleted = false
+}
+
+/// The `complete` and `uncomplete` commands, which differ only in the state they set.
+private struct SetCompletion<Mode: CompletionMode>: FormattedCommand {
+    static var configuration: CommandConfiguration {
+        CommandConfiguration(
+            commandName: Mode.verb,
+            abstract: "\(Mode.verb.capitalized) a reminder")
+    }
 
     @Argument(
-        help: "The list to uncomplete a reminder on: a name, a unique part of a name, or an ID from 'show-lists'",
+        help: "The list to \(Mode.verb) a reminder on: a name, a unique part of a name, or an ID from 'show-lists'",
         completion: .custom(listNameCompletion))
     var listNameOrId: String
 
     @Argument(
-        help: ArgumentHelp("The ids of the reminders to uncomplete, or unique prefixes of at least 4 characters, "
+        help: ArgumentHelp("The ids of the reminders to \(Mode.verb), or unique prefixes of at least 4 characters, "
             + "see 'show' for IDs; \(batchIdsHelp)"))
     var ids: [String] = []
 
@@ -522,7 +444,7 @@ private struct Uncomplete: FormattedCommand {
     }
 
     func run() throws {
-        try reminders.setComplete(false, items: ReminderSelection(arguments: self.ids),
+        try reminders.setComplete(Mode.isCompleted, items: ReminderSelection(arguments: self.ids),
                             onListNamedOrId: self.listNameOrId,
                             outputFormat: format)
     }
@@ -568,8 +490,8 @@ private func requireIds(_ ids: [String]) throws {
 }
 
 func listNameCompletion(_ arguments: [String], _ position: Int, _ prefix: String) -> [String] {
-    // NOTE: A list name with ':' was separated in zsh completion, there might be more of these or
-    // this might break other shells
+    // zsh splits a completion at an unescaped ":", so list names escape it. Other characters or shells
+    // may need the same treatment.
     return reminders.getListNames().map { $0.replacingOccurrences(of: ":", with: "\\:") }
 }
 
@@ -901,8 +823,8 @@ public struct CLI: ParsableCommand {
         version: version,
         subcommands: [
             Add.self,
-            Complete.self,
-            Uncomplete.self,
+            SetCompletion<CompleteMode>.self,
+            SetCompletion<UncompleteMode>.self,
             Delete.self,
             Edit.self,
             Postpone.self,

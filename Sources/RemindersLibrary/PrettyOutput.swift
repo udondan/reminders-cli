@@ -117,10 +117,9 @@ extension PrettyRow {
     static let idPrefixLength = 8
 
     init(_ reminder: EKReminder) {
-        let id = reminder.calendarItemExternalIdentifier ?? "<unknown-id>"
         self.init(
             title: reminder.title ?? "<unknown>",
-            idPrefix: String(id.prefix(Self.idPrefixLength)),
+            idPrefix: String(reminder.displayId.prefix(Self.idPrefixLength)),
             isCompleted: reminder.isCompleted,
             completionDate: reminder.completionDate,
             dueDate: reminder.dueDateComponents?.date,
@@ -137,6 +136,20 @@ extension PrettyRow {
 struct PrettyGroup {
     let title: String
     let rows: [PrettyRow]
+}
+
+/// One group per list that has matching reminders, in the order of `calendars`, keeping the order
+/// of `reminders` within each group.
+func prettyGroups(_ reminders: [EKReminder], in calendars: [EKCalendar]) -> [PrettyGroup] {
+    let byList = Dictionary(grouping: reminders) { $0.calendar.calendarIdentifier }
+    var seen = Set<String>()
+    return calendars.compactMap { calendar -> PrettyGroup? in
+        guard seen.insert(calendar.calendarIdentifier).inserted,
+              let reminders = byList[calendar.calendarIdentifier] else {
+            return nil
+        }
+        return PrettyGroup(title: calendar.title, rows: reminders.map(PrettyRow.init))
+    }
 }
 
 private let maximumTitleWidth = 40
@@ -298,7 +311,7 @@ private func header(for group: PrettyGroup, now: Date) -> String {
 /// repeat, flag, notes and ID prefix. Columns are as wide as their widest value across all groups
 /// (titles capped at `maximumTitleWidth`); a column that's empty in every row is left out. With
 /// `verbose` the notes marker is replaced by an excerpt on its own line under the title.
-func formatPretty(  // swiftlint:disable:this function_body_length
+func formatPretty(
     _ groups: [PrettyGroup], now: Date, calendar: Calendar = .current, style: PrettyStyle,
     verbose: Bool
 ) -> [String] {
@@ -306,66 +319,89 @@ func formatPretty(  // swiftlint:disable:this function_body_length
         return [style.apply("No reminders", .dim)]
     }
 
-    typealias Cell = (text: String, attribute: PrettyStyle.Attribute?)
-    let priorityCells: [Priority: Cell] = [
-        .low: ("!", .blue), .medium: ("!!", .yellow), .high: ("!!!", .red),
-    ]
-
-    func cells(for row: PrettyRow) -> [Cell] {
-        let due = prettyDueText(for: row, now: now, calendar: calendar)
-        let recurrence = row.recurrence.map {
-            "↻ " + prettyRecurrenceText(frequency: $0.frequency, interval: $0.interval)
-        }
-        var cells: [Cell] = [
-            (truncate(row.title, toWidth: maximumTitleWidth), row.isCompleted ? .dim : nil),
-            (due?.text ?? "", due?.attribute),
-            row.priority.flatMap { priorityCells[$0] } ?? ("", nil),
-            (recurrence ?? "", .dim),
-            (row.isFlagged ? "⚑" : "", .yellow),
-        ]
-        if !verbose {
-            cells.append((row.notes == nil ? "" : "📝", nil))
-        }
-        cells.append((row.idPrefix, .dim))
-        return cells
+    let table = groups.map { group in
+        group.rows.map { prettyCells(for: $0, now: now, calendar: calendar, verbose: verbose) }
     }
-
-    let table = groups.map { $0.rows.map(cells(for:)) }
-    let allRows = table.flatMap { $0 }
-    let columnCount = allRows.first?.count ?? 0
-    let widths = (0..<columnCount).map { column in
-        allRows.map { displayWidth($0[column].text) }.max() ?? 0
-    }
-    // The title and ID columns are always shown, even if every value happens to be empty.
-    let visibleColumns = (0..<columnCount).filter {
-        $0 == 0 || $0 == columnCount - 1 || widths[$0] > 0
-    }
+    let columns = PrettyColumns(table.flatMap { $0 })
 
     var lines: [String] = []
     for (group, rows) in zip(groups, table) {
         if !lines.isEmpty {
             lines.append("")
         }
-        let title = header(for: group, now: now)
-        lines.append(style.apply(title, .bold))
-        lines.append(String(repeating: "─", count: displayWidth(title)))
-        if rows.isEmpty {
-            lines.append(" " + style.apply("No reminders", .dim))
-            continue
+        lines += prettyLines(
+            for: group, cells: rows, columns: columns, now: now, style: style, verbose: verbose)
+    }
+    return lines
+}
+
+private typealias PrettyCell = (text: String, attribute: PrettyStyle.Attribute?)
+
+private let priorityCells: [Priority: PrettyCell] = [
+    .low: ("!", .blue), .medium: ("!!", .yellow), .high: ("!!!", .red),
+]
+
+/// One row's cells: title, due, priority, repeat, flag, the notes marker (without `verbose`), ID.
+private func prettyCells(for row: PrettyRow, now: Date, calendar: Calendar, verbose: Bool) -> [PrettyCell] {
+    let due = prettyDueText(for: row, now: now, calendar: calendar)
+    let recurrence = row.recurrence.map {
+        "↻ " + prettyRecurrenceText(frequency: $0.frequency, interval: $0.interval)
+    }
+    var cells: [PrettyCell] = [
+        (truncate(row.title, toWidth: maximumTitleWidth), row.isCompleted ? .dim : nil),
+        (due?.text ?? "", due?.attribute),
+        row.priority.flatMap { priorityCells[$0] } ?? ("", nil),
+        (recurrence ?? "", .dim),
+        (row.isFlagged ? "⚑" : "", .yellow),
+    ]
+    if !verbose {
+        cells.append((row.notes == nil ? "" : "📝", nil))
+    }
+    cells.append((row.idPrefix, .dim))
+    return cells
+}
+
+/// The width of every column across all rows, and the columns that are shown.
+private struct PrettyColumns {
+    let widths: [Int]
+    let visible: [Int]
+
+    init(_ rows: [[PrettyCell]]) {
+        let count = rows.first?.count ?? 0
+        let widths = (0..<count).map { column in
+            rows.map { displayWidth($0[column].text) }.max() ?? 0
         }
-        for (row, rowCells) in zip(group.rows, rows) {
-            let glyph = row.isCompleted ? style.apply("✓", .green) : "○"
-            let rendered = visibleColumns.enumerated().map { position, column -> String in
-                let cell = rowCells[column]
-                let text = style.apply(cell.text, cell.attribute)
-                let isLast = position == visibleColumns.count - 1
-                let padding = isLast ? 0 : widths[column] - displayWidth(cell.text)
-                return text + String(repeating: " ", count: padding)
-            }
-            lines.append(" \(glyph) " + rendered.joined(separator: "  "))
-            if verbose, let notes = row.notes {
-                lines.append("   " + style.apply(notesExcerpt(notes), .dim))
-            }
+        self.widths = widths
+        // The title and ID columns are always shown, even if every value happens to be empty.
+        self.visible = (0..<count).filter { $0 == 0 || $0 == count - 1 || widths[$0] > 0 }
+    }
+
+    /// The row's visible cells, styled and padded to their column width (except the last one).
+    func render(_ cells: [PrettyCell], style: PrettyStyle) -> String {
+        visible.enumerated().map { position, column -> String in
+            let cell = cells[column]
+            let isLast = position == visible.count - 1
+            let padding = isLast ? 0 : widths[column] - displayWidth(cell.text)
+            return style.apply(cell.text, cell.attribute) + String(repeating: " ", count: padding)
+        }.joined(separator: "  ")
+    }
+}
+
+/// One group's header, rule and rows, or its "No reminders" line.
+private func prettyLines(
+    for group: PrettyGroup, cells: [[PrettyCell]], columns: PrettyColumns, now: Date, style: PrettyStyle,
+    verbose: Bool
+) -> [String] {
+    let title = header(for: group, now: now)
+    var lines = [style.apply(title, .bold), String(repeating: "─", count: displayWidth(title))]
+    guard !cells.isEmpty else {
+        return lines + [" " + style.apply("No reminders", .dim)]
+    }
+    for (row, rowCells) in zip(group.rows, cells) {
+        let glyph = row.isCompleted ? style.apply("✓", .green) : "○"
+        lines.append(" \(glyph) " + columns.render(rowCells, style: style))
+        if verbose, let notes = row.notes {
+            lines.append("   " + style.apply(notesExcerpt(notes), .dim))
         }
     }
     return lines
