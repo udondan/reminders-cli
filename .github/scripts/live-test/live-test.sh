@@ -33,11 +33,14 @@ assert_eq() {
 }
 
 list_id=""
+other_id=""
 cleanup() {
-    if [ -n "$list_id" ]; then
-        echo "--- cleanup: delete-list $list_id"
-        run delete-list "$list_id" --confirm --format json || true
-    fi
+    for leftover in "$list_id" "$other_id"; do
+        if [ -n "$leftover" ]; then
+            echo "--- cleanup: delete-list $leftover"
+            run delete-list "$leftover" --confirm --format json || true
+        fi
+    done
 }
 trap cleanup EXIT
 
@@ -140,6 +143,71 @@ run show-all --list "$list_id" --format json  | jq -e 'length >= 1' >/dev/null |
 run show-all --list "$list_id" --format pretty | grep -q "Water the plants" || fail "show-all pretty"
 run show-lists --format json | jq -e --arg id "$list_id" 'any(.[]; .calendarIdentifier == $id)' \
     >/dev/null || fail "show-lists missing test list"
+
+# --- listings: plain, sorted, the shortcuts, show-lists options ---------------
+echo "--- listings"
+run show-all --list "$list_id" --sort due-date --format plain | grep -q "Water the plants" \
+    || fail "sorted plain show-all"
+run show "$list_id" --sort priority --sort-order descending --format json | jq -e 'length == 3' >/dev/null \
+    || fail "sorted show"
+# The test reminders are due in September 2026, so they're overdue by now. Only the shape is
+# checked, so the result doesn't depend on today's date.
+for shortcut in today overdue upcoming; do
+    run "$shortcut" --list "$list_id" --format json | jq -e 'type == "array"' >/dev/null || fail "$shortcut"
+done
+run show-lists | grep -qF "$name" || fail "plain show-lists missing test list"
+run show-lists --include-completed --sort name --format json \
+    | jq -e --arg id "$list_id" 'any(.[]; .calendarIdentifier == $id and .completedCount == 0)' >/dev/null \
+    || fail "show-lists --include-completed"
+# A runner may or may not have a default list; either answer is fine.
+set +e
+run show-lists --default-only --format json >default.out 2>default.err
+code=$?
+set -e
+if [ "$code" = 0 ]; then
+    jq -e 'length == 1' default.out >/dev/null || fail "show-lists --default-only"
+else
+    grep -q '"no_default_list"' default.err || fail "show-lists --default-only: unexpected error"
+fi
+
+# --- doctor and shell completion --------------------------------------------
+echo "--- doctor / completion"
+run doctor | grep -q "Reminders access" || fail "plain doctor"
+# The arguments the generated zsh completion script passes for a list name.
+run ---completion show -- positional@0 2 0 reminders show "" | grep -qF "$name" || fail "list name completion"
+
+# --- plain output, a second list, moving a reminder ---------------------------
+echo "--- new-list errors"
+set +e
+run new-list "unused" --source "zz-no-such-source-$(uuidgen)" --format json 2>source.err
+code=$?
+set -e
+assert_eq "unknown source exit code" "8" "$code"
+grep -q '"source_not_found"' source.err || fail "expected source_not_found"
+
+echo "--- plain output"
+other_name="zz-cli-ci-$(uuidgen)"
+assert_eq "plain new-list" "Created new list '$other_name'!" "$(run new-list "$other_name")"
+other_id=$(run show-lists --format json | jq -r --arg n "$other_name" '.[] | select(.title == $n) | .calendarIdentifier')
+[ -n "$other_id" ] || fail "second list not found"
+
+assert_eq "plain add" "Added reminder 'Plain' to list '$name'" \
+    "$(run add --due-date "2026-09-22 08:00" "$list_id" "Plain")"
+plain_id=$(run show "$list_id" --format json | jq -r '.[] | select(.title == "Plain") | .externalId')
+assert_eq "plain edit" "Updated reminder 'Plain text'" "$(run edit "$list_id" "$plain_id" "Plain text")"
+assert_eq "plain postpone" "Postponed reminder 'Plain text'" \
+    "$(run postpone "$list_id" "$plain_id" "2026-09-23 08:00")"
+assert_eq "plain complete" "Completed 'Plain text'" "$(run complete "$list_id" "$plain_id")"
+assert_eq "plain uncomplete" "Uncompleted 'Plain text'" "$(run uncomplete "$list_id" "$plain_id")"
+
+echo "--- edit --list"
+moved=$(run edit --list "$other_id" --format json "$list_id" "$plain_id")
+assert_eq "moved to list" "$other_id" "$(jqr .listId <<<"$moved")"
+moved_id=$(jqr .externalId <<<"$moved")
+assert_eq "plain delete" "Deleted 'Plain text'" "$(run delete "$other_id" "$moved_id")"
+assert_eq "plain delete-list" "Deleted list '$other_name' (0 reminders)" \
+    "$(run delete-list "$other_id" --confirm)"
+other_id=""
 
 # --- delete: single, then batch ---------------------------------------------
 echo "--- delete"
