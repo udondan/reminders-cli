@@ -92,7 +92,6 @@ enum RecurrenceUpdateError: LocalizedError {
     case missingExistingRule
     case missingDueDate
     case endBeforeDueDate
-    case failedToCopyExistingRule
     case repeatOnRequiresWeekly
 
     var errorDescription: String? {
@@ -105,8 +104,6 @@ enum RecurrenceUpdateError: LocalizedError {
             return "A repeating reminder requires a due date"
         case .endBeforeDueDate:
             return "The repeat end date cannot be earlier than the reminder's due date"
-        case .failedToCopyExistingRule:
-            return "The existing repeat rule could not be copied safely"
         case .repeatOnRequiresWeekly:
             return "Repeat days only apply to a weekly repeat rule; pass --repeat weekly"
         }
@@ -146,10 +143,9 @@ struct RecurrenceUpdate {
         // initializer exposes, including provider-specific calendar metadata
         // and firstDayOfTheWeek. Copy the complete EventKit rule and modify its
         // sole writable recurrence property rather than reconstructing it.
-        if let existingRule, recurrence == nil, interval == nil, days == .unchanged {
-            guard let copiedRule = existingRule.copy() as? EKRecurrenceRule else {
-                throw RecurrenceUpdateError.failedToCopyExistingRule
-            }
+        if recurrence == nil, interval == nil, days == .unchanged,
+            let copiedRule = existingRule?.copy() as? EKRecurrenceRule
+        {
             copiedRule.recurrenceEnd = resolvedEnd
             return copiedRule
         }
@@ -201,10 +197,7 @@ func recurrenceEndDate(from components: DateComponents) -> Date? {
     guard components.hour == nil && components.minute == nil && components.second == nil else {
         return date
     }
-    guard let nextDay = calendar.date(byAdding: .day, value: 1, to: date) else {
-        return nil
-    }
-    return nextDay.addingTimeInterval(-1)
+    return calendar.date(byAdding: .day, value: 1, to: date)?.addingTimeInterval(-1)
 }
 
 private func recurrenceEnd(dateComponents: DateComponents?) throws -> EKRecurrenceEnd? {
@@ -355,9 +348,9 @@ private func nextWeekdayOccurrence(
     onOrAfter referenceDate: Date, calendar: Calendar,
     isWithinBounds: (Date, Int) -> Bool
 ) -> Date? {
-    guard let anchorWeek = calendar.dateInterval(of: .weekOfYear, for: anchor)?.start else {
-        return nil
-    }
+    // The anchor's position in its week (0 = the calendar's first weekday). With it, the week of
+    // the day `dayOffset` days after the anchor is plain arithmetic.
+    let anchorPositionInWeek = (calendar.component(.weekday, from: anchor) - calendar.firstWeekday + 7) % 7
 
     var occurrence = anchor
     var occurrenceNumber = 1
@@ -371,14 +364,11 @@ private func nextWeekdayOccurrence(
         while !isOccurrence {
             dayOffset += 1
             guard dayOffset <= maxRecurrenceSteps * 7,
-                let day = calendar.date(byAdding: .day, value: dayOffset, to: anchor),
-                let week = calendar.dateInterval(of: .weekOfYear, for: day)?.start
+                let day = calendar.date(byAdding: .day, value: dayOffset, to: anchor)
             else {
                 return nil
             }
-            let weeksSinceAnchor = calendar.dateComponents(
-                [.weekOfYear], from: anchorWeek, to: week
-            ).weekOfYear ?? 0
+            let weeksSinceAnchor = (anchorPositionInWeek + dayOffset) / 7
             occurrence = day
             isOccurrence = weekdays.contains(calendar.component(.weekday, from: day))
                 && weeksSinceAnchor % interval == 0
@@ -408,17 +398,15 @@ func nextDueDate(from reminder: EKReminder, referenceDate: Date = Date()) -> Dat
 // and Sunday all land on the following Monday. Preserves `anchor`'s
 // time-of-day when it had one; a date-only (all-day) anchor stays date-only.
 func nextWeekday(after anchor: DateComponents, calendar: Calendar = Calendar.current) -> DateComponents? {
-    guard let anchorDate = anchor.date else {
+    // A weekend is at most two days, so a weekday is at most three days ahead; a week covers any
+    // calendar's weekend.
+    guard let anchorDate = anchor.date,
+        let candidate = (1...7).lazy
+            .compactMap({ calendar.date(byAdding: .day, value: $0, to: anchorDate) })
+            .first(where: { !calendar.isDateInWeekend($0) })
+    else {
         return nil
     }
-
-    var candidate = anchorDate
-    repeat {
-        guard let next = calendar.date(byAdding: .day, value: 1, to: candidate) else {
-            return nil
-        }
-        candidate = next
-    } while calendar.isDateInWeekend(candidate)
 
     let wantedComponents = anchor.hour != nil
         ? calendarComponents()
