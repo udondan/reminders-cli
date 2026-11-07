@@ -100,6 +100,13 @@ final class ConfigureNewReminderTests: InMemoryReminderTestCase {
             message: "The repeat end date cannot be earlier than the reminder's due date")
     }
 
+    func testRepeatEndWithoutADateIsAnInvalidArgument() {
+        assertCLIError(
+            try configure(
+                dueDateComponents: due(2026, 10, 1), recurrence: .daily, endDate: due(9_999_999_999_999, 1, 1)),
+            code: .invalidArgument, message: "The repeat end date could not be parsed")
+    }
+
     func testRepeatDaysWithoutWeeklyIsAnInvalidArgument() throws {
         let days = try RepeatDays(parsing: "mon")
         assertCLIError(
@@ -283,6 +290,12 @@ final class ApplyEditTests: InMemoryReminderTestCase {
             try applyEdit(to: fullReminder(), newRecurrenceEndDate: due(2026, 9, 1)),
             code: .invalidArgument,
             message: "The repeat end date cannot be earlier than the reminder's due date")
+    }
+
+    func testRepeatEndWithoutADateIsAnInvalidArgument() {
+        assertCLIError(
+            try applyEdit(to: fullReminder(), newRecurrenceEndDate: due(9_999_999_999_999, 1, 1)),
+            code: .invalidArgument, message: "The repeat end date could not be parsed")
     }
 
     /// A repeating reminder without a due date can come from another app. Editing only its text

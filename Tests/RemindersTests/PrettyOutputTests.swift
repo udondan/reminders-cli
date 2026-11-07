@@ -294,6 +294,31 @@ final class PrettyOutputTests: XCTestCase {
         reminder.notes = ""
         XCTAssertEqual(format(reminder, id: "1"), "1: Read a book")
     }
+
+    func testPlainOutputShowsTheDueDateRelativeToNow() throws {
+        let reminder = plainReminder("Pay rent")
+        let due = DateComponents(calendar: .current, year: 2020, month: 1, day: 1, hour: 12)
+        reminder.dueDateComponents = due
+        let relative = relativeDueDate(for: try XCTUnwrap(due.date), relativeTo: Date())
+        XCTAssertEqual(format(reminder, id: "1"), "1: Pay rent (\(relative))")
+    }
+
+    // MARK: Defaults
+
+    func testStandardOutputStyleFollowsTheTerminal() {
+        XCTAssertEqual(
+            PrettyStyle.standardOutput.enabled,
+            PrettyStyle.colorEnabled(
+                isTTY: isatty(STDOUT_FILENO) != 0, environment: ProcessInfo.processInfo.environment))
+    }
+
+    func testRowDefaultsToAnOpenUnflaggedReminderWithoutDueDate() {
+        let row = PrettyRow(title: "Read a book", idPrefix: "1234ABCD")
+        XCTAssertFalse(row.isCompleted)
+        XCTAssertFalse(row.dueIsDateOnly)
+        XCTAssertFalse(row.isFlagged)
+        XCTAssertNil(row.dueDate)
+    }
 }
 
 final class ListingFormatTests: XCTestCase {
