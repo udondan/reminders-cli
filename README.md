@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/banner-dark.png">
-  <img alt="reminders-cli: Apple Reminders. In your terminal." src="docs/banner-light.png">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/banner-dark.webp">
+  <img alt="reminders-cli: Apple Reminders. In your terminal." src="docs/banner-light.webp">
 </picture>
 
 [![Release](https://img.shields.io/github/v/release/udondan/reminders-cli)][latest]
