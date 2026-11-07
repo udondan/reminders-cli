@@ -159,6 +159,20 @@ run show-lists | grep -qF "$name" || fail "plain show-lists missing test list"
 run show-lists --include-completed --sort name --format json \
     | jq -e --arg id "$list_id" 'any(.[]; .calendarIdentifier == $id and .completedCount == 0)' >/dev/null \
     || fail "show-lists --include-completed"
+assert_eq "show-all --only-completed" "0" \
+    "$(run show-all --list "$list_id" --only-completed --format json | jq length)"
+assert_eq "show-all --include-completed" "3" \
+    "$(run show-all --list "$list_id" --include-completed --format json | jq length)"
+assert_eq "show --only-completed" "0" "$(run show "$list_id" --only-completed --format json | jq length)"
+assert_eq "show-all --search" "1" \
+    "$(run show-all --list "$list_id" --search "plants" --format json | jq length)"
+# A list without any match is left out of the pretty view.
+run show-all --list "$list_id" --search "zz-no-match" --format pretty | grep -qF "$name" \
+    && fail "pretty show-all lists a list without matches"
+set +e
+run show-all --list "zz-no-such-list-$(uuidgen)" --format json 2>nolist.err
+set -e
+grep -q '"list_not_found"' nolist.err || fail "expected list_not_found from show-all"
 # A runner may or may not have a default list; either answer is fine.
 set +e
 run show-lists --default-only --format json >default.out 2>default.err
