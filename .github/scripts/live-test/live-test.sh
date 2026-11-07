@@ -34,8 +34,9 @@ assert_eq() {
 
 list_id=""
 other_id=""
+completion_id=""
 cleanup() {
-    for leftover in "$list_id" "$other_id"; do
+    for leftover in "$list_id" "$other_id" "$completion_id"; do
         if [ -n "$leftover" ]; then
             echo "--- cleanup: delete-list $leftover"
             run delete-list "$leftover" --confirm --format json || true
@@ -189,6 +190,15 @@ echo "--- doctor / completion"
 run doctor | grep -q "Reminders access" || fail "plain doctor"
 # The arguments the generated zsh completion script passes for a list name.
 run ---completion show -- positional@0 2 0 reminders show "" | grep -qF "$name" || fail "list name completion"
+
+# Completing a list name with characters the shells treat specially, in bash, zsh and fish. The
+# command substitutions would create zz-marker if a shell ran them.
+completion_prefix="zz-cli-ci-comp-$(uuidgen)"
+completion_name="$completion_prefix: it's \"q\" \$(touch zz-marker) \`touch zz-marker\` back\\slash"
+completion_id=$(run new-list "$completion_name" --format json | jqr .calendarIdentifier)
+bash "$(dirname "$0")/check-completion.sh" "$binary" "$completion_name" "$completion_prefix"
+run delete-list "$completion_id" --confirm >/dev/null
+completion_id=""
 
 # --- plain output, a second list, moving a reminder ---------------------------
 echo "--- new-list errors"

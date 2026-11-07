@@ -490,9 +490,8 @@ private func requireIds(_ ids: [String]) throws {
 }
 
 func listNameCompletion(_ arguments: [String], _ position: Int, _ prefix: String) -> [String] {
-    // NOTE(#126): A list name with ':' was separated in zsh completion, there might be more of these or
-    // this might break other shells
-    return reminders.getListNames().map { $0.replacingOccurrences(of: ":", with: "\\:") }
+    let shell = CompletionShell.requesting
+    return reminders.getListNames().map { escapeCompletionCandidate($0, for: shell) }
 }
 
 private struct Edit: FormattedCommand {
