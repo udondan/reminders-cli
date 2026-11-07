@@ -8,30 +8,14 @@ extension Reminders {
         outputFormat: OutputFormat, defaultOnly: Bool = false, includeCompleted: Bool = false,
         sort: ListSort = .none
     ) throws {
-        let calendars: [EKCalendar]
-        if defaultOnly {
-            guard let defaultCalendar = self.getDefaultList() else {
-                throw CLIError.noDefaultList()
-            }
-            calendars = [defaultCalendar]
-        } else {
-            calendars = self.getCalendars()
-        }
+        let calendars = defaultOnly
+            ? [try self.getDefaultList().orThrow(CLIError.noDefaultList())]
+            : self.getCalendars()
         let now = Date()
         // One fetch across every list, bucketed afterwards, rather than one fetch per list.
         // Completed reminders are only fetched on request: they dominate a store that has been in
         // use for a while and make the fetch noticeably slower.
-        let reminders: [EKReminder]
-        if calendars.isEmpty {
-            reminders = []
-        } else if includeCompleted {
-            reminders = self.fetchReminders(on: calendars, displayOptions: .all)
-        } else {
-            reminders = self.fetchReminders(
-                matching: eventStore.predicateForIncompleteReminders(
-                    withDueDateStarting: nil, ending: nil, calendars: calendars),
-                displayOptions: .incomplete)
-        }
+        let reminders = self.fetchReminders(on: calendars, displayOptions: includeCompleted ? .all : .incomplete)
         let summaries = sort.apply(
             to: summarizeLists(
                 calendars, reminders: reminders, now: now, includeCompleted: includeCompleted))
@@ -55,12 +39,7 @@ extension Reminders {
         var data: DoctorData?
         if authorization == .fullAccess {
             let calendars = self.getCalendars()
-            let openReminders = calendars.isEmpty
-                ? []
-                : self.fetchReminders(
-                    matching: eventStore.predicateForIncompleteReminders(
-                        withDueDateStarting: nil, ending: nil, calendars: calendars),
-                    displayOptions: .incomplete)
+            let openReminders = self.fetchReminders(on: calendars, displayOptions: .incomplete)
             data = DoctorData(
                 sources: summarizeSources(calendars.map { $0.source?.title ?? "Unknown" }),
                 defaultList: self.getDefaultList().map {
@@ -104,26 +83,15 @@ extension Reminders {
                 holdsReminderLists: reminderSourceIds.contains($0.sourceIdentifier))
         }
 
-        let source: EKSource
-        switch selectListSource(requested: requestedSourceName, from: candidates) {
-        case .chosen(let index):
-            source = store.sources[index]
-        case .noSources:
-            throw CLIError.noSources()
-        case .notFound(let requested):
-            throw CLIError.sourceNotFound(requested)
-        case .ambiguous(let titles):
-            throw CLIError.sourceAmbiguous(titles)
-        }
+        let source = store.sources[
+            try selectListSource(requested: requestedSourceName, from: candidates).chosenIndex()]
 
         let newList = EKCalendar(for: .reminder, eventStore: store)
         newList.title = name
         newList.source = source
 
-        do {
+        try reportingSaveFailure(action: "create list '\(name)'") {
             try store.saveCalendar(newList, commit: true)
-        } catch let error {
-            throw CLIError.saveFailed(action: "create list '\(name)'", underlying: error)
         }
         switch outputFormat {
         case .json:
@@ -161,10 +129,8 @@ extension Reminders {
             confirmation = "Deleted list '\(calendar.title)' (\(count))"
         }
 
-        do {
+        try reportingSaveFailure(action: "delete list '\(calendar.title)'") {
             try eventStore.removeCalendar(calendar, commit: true)
-        } catch let error {
-            throw CLIError.saveFailed(action: "delete list '\(calendar.title)'", underlying: error)
         }
         print(confirmation)
     }

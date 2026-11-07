@@ -222,3 +222,22 @@ extension CLIError: LocalizedError {
 private struct ErrorEnvelope: Encodable {
     let error: CLIError
 }
+
+/// Runs a write to the store, reporting any failure as `save_failed` for `action`.
+func reportingSaveFailure(action: String, _ write: () throws -> Void) throws {
+    do {
+        try write()
+    } catch {
+        throw CLIError.saveFailed(action: action, underlying: error)
+    }
+}
+
+extension Optional {
+    /// The wrapped value, or `error` thrown when there is none.
+    func orThrow(_ error: @autoclosure () -> Error) throws -> Wrapped {
+        guard let self else {
+            throw error()
+        }
+        return self
+    }
+}

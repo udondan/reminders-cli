@@ -317,7 +317,7 @@ final class ApplyPostponeTests: InMemoryReminderTestCase {
         reminder.addRecurrenceRule(EKRecurrenceRule(
             recurrenceWith: .weekly, interval: 2, end: EKRecurrenceEnd(occurrenceCount: 5)))
 
-        try applyPostpone(to: reminder, newDueDate: due(2026, 9, 16, hour: 17), toNextWeekday: false)
+        try applyPostpone(to: reminder, target: .date(due(2026, 9, 16, hour: 17)))
 
         XCTAssertEqual(reminder.dueDateComponents?.date, date(2026, 9, 16, 17))
         XCTAssertEqual(alarmDates(of: reminder), [date(2026, 9, 16, 17)])
@@ -332,7 +332,7 @@ final class ApplyPostponeTests: InMemoryReminderTestCase {
         let reminder = makeReminder()
         setDueDate(of: reminder, to: due(2026, 9, 14, hour: 8))
 
-        try applyPostpone(to: reminder, newDueDate: due(2026, 9, 16), toNextWeekday: false)
+        try applyPostpone(to: reminder, target: .date(due(2026, 9, 16)))
 
         XCTAssertEqual(reminder.dueDateComponents?.date, date(2026, 9, 16))
         XCTAssertEqual(alarmDates(of: reminder), [])
@@ -343,7 +343,7 @@ final class ApplyPostponeTests: InMemoryReminderTestCase {
         // 2026-09-18 is a Friday.
         setDueDate(of: reminder, to: due(2026, 9, 18, hour: 8))
 
-        try applyPostpone(to: reminder, newDueDate: nil, toNextWeekday: true, calendar: utc)
+        try applyPostpone(to: reminder, target: .nextWeekday, calendar: utc)
 
         XCTAssertEqual(reminder.dueDateComponents?.date, date(2026, 9, 21, 8))
         XCTAssertEqual(alarmDates(of: reminder), [date(2026, 9, 21, 8)])
@@ -351,7 +351,7 @@ final class ApplyPostponeTests: InMemoryReminderTestCase {
 
     func testNextWeekdayWithoutDueDateIsNoDueDate() {
         XCTAssertThrowsError(
-            try applyPostpone(to: makeReminder(), newDueDate: nil, toNextWeekday: true, calendar: utc)
+            try applyPostpone(to: makeReminder(), target: .nextWeekday, calendar: utc)
         ) { error in
             XCTAssertEqual((error as? CLIError)?.code, .noDueDate)
         }
@@ -364,7 +364,7 @@ final class ApplyPostponeTests: InMemoryReminderTestCase {
             recurrenceWith: .daily, interval: 1, end: EKRecurrenceEnd(end: date(2026, 9, 30))))
 
         assertCLIError(
-            try applyPostpone(to: reminder, newDueDate: due(2026, 10, 2), toNextWeekday: false),
+            try applyPostpone(to: reminder, target: .date(due(2026, 10, 2))),
             code: .invalidArgument,
             message: "The repeat end date cannot be earlier than the reminder's due date")
     }

@@ -1,3 +1,4 @@
+import ArgumentParser
 import EventKit
 import Foundation
 
@@ -164,25 +165,43 @@ private func replaceRecurrenceRules(of reminder: EKReminder, with rules: [EKRecu
     }
 }
 
-/// One reminder's share of `postpone`: the new due date, or with `toNextWeekday` the next weekday
+/// Where `postpone` moves a due date: to a given date, or to the next weekday after the current one.
+enum PostponeTarget: Equatable {
+    case date(DateComponents)
+    case nextWeekday
+
+    /// The target from `postpone`'s arguments, which take exactly one of the two.
+    init(date: DateComponents?, nextWeekday: Bool) throws {
+        switch (date, nextWeekday) {
+        case (.some, true):
+            throw ValidationError("Cannot specify both a new due date and --next-weekday")
+        case (nil, false):
+            throw ValidationError("Must specify either a new due date or --next-weekday")
+        case (.some(let date), false):
+            self = .date(date)
+        case (nil, true):
+            self = .nextWeekday
+        }
+    }
+}
+
+/// One reminder's share of `postpone`: the new due date, or for `.nextWeekday` the next weekday
 /// after its current one (`no_due_date` without one). Its repeat rules are never read or written,
 /// so they pass through unchanged; the schedule is still checked against the new due date.
 func applyPostpone(
-    to reminder: EKReminder, newDueDate: DateComponents?, toNextWeekday: Bool,
-    calendar: Calendar = .current
+    to reminder: EKReminder, target: PostponeTarget, calendar: Calendar = .current
 ) throws {
     let resolvedComponents: DateComponents
-    if toNextWeekday {
+    switch target {
+    case .date(let newDueDate):
+        resolvedComponents = newDueDate
+    case .nextWeekday:
         guard let currentDue = reminder.dueDateComponents,
             let shifted = nextWeekday(after: currentDue, calendar: calendar)
         else {
             throw CLIError.noDueDate()
         }
         resolvedComponents = shifted
-    } else if let newDueDate {
-        resolvedComponents = newDueDate
-    } else {
-        fatalError("postpone requires either a new due date or --next-weekday")
     }
 
     setDueDate(of: reminder, to: resolvedComponents)

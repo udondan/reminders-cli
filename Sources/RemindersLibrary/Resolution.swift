@@ -93,10 +93,17 @@ func checkListDeletion(
 
 /// The `delete-list --format json` output.
 struct DeletedList: Encodable {
-    let deleted = true
+    let deleted: Bool
     let title: String
     let calendarIdentifier: String
     let reminderCount: Int
+
+    init(title: String, calendarIdentifier: String, reminderCount: Int) {
+        self.deleted = true
+        self.title = title
+        self.calendarIdentifier = calendarIdentifier
+        self.reminderCount = reminderCount
+    }
 }
 
 /// The shortest ID prefix that's accepted in place of a full reminder ID. Anything shorter only
@@ -205,6 +212,20 @@ enum ListSourceSelection: Equatable {
     case notFound(String)
     /// Several differently-titled sources hold reminder lists and no `--source` was given.
     case ambiguous([String])
+
+    /// The index of the chosen source, or the `CLIError` for why there is none.
+    func chosenIndex() throws -> Int {
+        switch self {
+        case .chosen(let index):
+            return index
+        case .noSources:
+            throw CLIError.noSources()
+        case .notFound(let requested):
+            throw CLIError.sourceNotFound(requested)
+        case .ambiguous(let titles):
+            throw CLIError.sourceAmbiguous(titles)
+        }
+    }
 }
 
 /// Picks the source for `new-list`, considering only sources that already hold reminder lists.

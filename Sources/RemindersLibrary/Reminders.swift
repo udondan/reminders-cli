@@ -192,8 +192,7 @@ public final class Reminders {
     func postpone(
         items selection: ReminderSelection,
         onListNamedOrId nameOrId: String,
-        to newDueDateComponents: DateComponents?,
-        toNextWeekday: Bool,
+        to target: PostponeTarget,
         outputFormat: OutputFormat) throws
     {
         let calendar = try self.calendar(withNameOrId: nameOrId)
@@ -203,7 +202,7 @@ public final class Reminders {
 
         try self.discardingChangesOnError {
             for reminder in reminders {
-                try applyPostpone(to: reminder, newDueDate: newDueDateComponents, toNextWeekday: toNextWeekday)
+                try applyPostpone(to: reminder, target: target)
             }
         }
 
@@ -294,15 +293,24 @@ public final class Reminders {
         }
     }
 
+    /// The reminders on `calendars`. For incomplete ones only, EventKit's incomplete-reminders
+    /// predicate keeps completed reminders out of the fetch, which is noticeably faster on a store
+    /// that has been in use for a while.
     func fetchReminders(on calendars: [EKCalendar], displayOptions: DisplayOptions) -> [EKReminder] {
-        return self.fetchReminders(
-            matching: eventStore.predicateForReminders(in: calendars), displayOptions: displayOptions)
+        // EventKit reads an empty calendar list as every list.
+        guard !calendars.isEmpty else {
+            return []
+        }
+        let predicate = displayOptions == .incomplete
+            ? eventStore.predicateForIncompleteReminders(withDueDateStarting: nil, ending: nil, calendars: calendars)
+            : eventStore.predicateForReminders(in: calendars)
+        return self.fetchReminders(matching: predicate, displayOptions: displayOptions)
     }
 
     /// EventKit only offers a callback-based fetch; block on it once here so every command
     /// can be written as straight-line code that simply throws on failure (nothing can be
     /// thrown from inside EventKit's completion closure).
-    func fetchReminders(matching predicate: NSPredicate, displayOptions: DisplayOptions) -> [EKReminder] {
+    private func fetchReminders(matching predicate: NSPredicate, displayOptions: DisplayOptions) -> [EKReminder] {
         let semaphore = DispatchSemaphore(value: 0)
         var fetched: [EKReminder] = []
         eventStore.fetchReminders(matching: predicate) { reminders in
@@ -315,10 +323,8 @@ public final class Reminders {
     }
 
     private func save(_ reminder: EKReminder, action: String) throws {
-        do {
+        try reportingSaveFailure(action: action) {
             try eventStore.save(reminder, commit: true)
-        } catch let error {
-            throw CLIError.saveFailed(action: action, underlying: error)
         }
     }
 
@@ -334,12 +340,11 @@ public final class Reminders {
     /// Runs `stage` (saves or removes with `commit: false`), then commits them together. If
     /// anything fails, the staged changes are discarded so the store is left as it was.
     private func commitAll(action: String, count: Int, stage: () throws -> Void) throws {
-        do {
-            try stage()
-            try eventStore.commit()
-        } catch let error {
-            eventStore.reset()
-            throw CLIError.saveFailed(action: count > 1 ? action + "s" : action, underlying: error)
+        try self.discardingChangesOnError {
+            try reportingSaveFailure(action: count > 1 ? action + "s" : action) {
+                try stage()
+                try eventStore.commit()
+            }
         }
     }
 
