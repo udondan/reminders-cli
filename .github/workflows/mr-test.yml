@@ -187,6 +187,15 @@ jobs:
         if: steps.changes.outputs.code == 'true'
         run: bash .github/scripts/live-test/grant-reminders-access.sh .build/debug/reminders
 
+      # The live test completes a list name in each shell; the system bash (3.2) is too old for
+      # the generated completion script.
+      - name: Install bash and fish
+        if: steps.changes.outputs.code == 'true'
+        run: |
+          for shell in bash fish; do
+            [ -x "$(brew --prefix)/bin/$shell" ] || brew install "$shell"
+          done
+
       - name: Live test
         if: steps.changes.outputs.code == 'true'
         timeout-minutes: 5

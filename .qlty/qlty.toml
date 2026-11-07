@@ -103,13 +103,6 @@ match.rules = ["ripgrep:TODO"]
 match.file_patterns = ["Sources/RemindersLibrary/Sort.swift"]
 set.ignored = true
 
-# Known issue, tracked in https://github.com/udondan/reminders-cli/issues/126
-# (list name completion escaping). Remove this entry with the NOTE.
-[[triage]]
-match.rules = ["ripgrep:NOTE"]
-match.file_patterns = ["Sources/RemindersLibrary/CLI.swift"]
-set.ignored = true
-
 # The NOTE in testTonight explains why the test only asserts "evening, on the hour"; it's not an
 # open task.
 [[triage]]
