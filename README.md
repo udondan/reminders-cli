@@ -6,6 +6,8 @@
 [![Release](https://img.shields.io/github/v/release/udondan/reminders-cli)][latest]
 [![Homebrew](https://img.shields.io/badge/homebrew-udondan%2Fsoftware%2Freminders--cli-orange)][tap]
 [![CI](https://github.com/udondan/reminders-cli/actions/workflows/mr-test.yml/badge.svg?branch=main)][ci]
+[![codecov](https://codecov.io/gh/udondan/reminders-cli/graph/badge.svg)][codecov]
+[![Maintainability](https://qlty.sh/gh/udondan/projects/reminders-cli/maintainability.svg)][qlty]
 [![License](https://img.shields.io/github/license/udondan/reminders-cli)][license]
 
 A CLI for Apple Reminders on macOS: list, add, edit, complete, postpone and delete reminders from
@@ -757,4 +759,6 @@ pass `--format json` and act on reminders by their stable ID, never by title.
 [latest]: https://github.com/udondan/reminders-cli/releases/latest
 [tap]: https://github.com/udondan/homebrew-software
 [ci]: https://github.com/udondan/reminders-cli/actions/workflows/mr-test.yml
+[codecov]: https://codecov.io/gh/udondan/reminders-cli
+[qlty]: https://qlty.sh/gh/udondan/projects/reminders-cli
 [license]: https://github.com/udondan/reminders-cli/blob/main/LICENSE
