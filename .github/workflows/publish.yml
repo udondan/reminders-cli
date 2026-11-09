@@ -116,7 +116,7 @@ jobs:
               url "https://github.com/udondan/reminders-cli/releases/download/v{{ version }}/reminders.tar.gz"
               sha256 "{{ sha256 }}"
 
-              depends_on macos: :monterey
+              depends_on macos: :sonoma
 
               def install
                 bin.install "reminders"

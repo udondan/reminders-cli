@@ -35,27 +35,6 @@ enum ReminderAuthorization: String, Encodable {
     }
 }
 
-/// The EventKit call every other command uses to request access on this macOS version, mirroring
-/// the `#available` branch in `Reminders.requestAccess()`.
-enum AccessRequestAPI: String, Encodable {
-    case requestFullAccessToReminders
-    case requestAccess
-
-    static var current: AccessRequestAPI {
-        if #available(macOS 14.0, *) {
-            return .requestFullAccessToReminders
-        }
-        return .requestAccess
-    }
-
-    var label: String {
-        switch self {
-        case .requestFullAccessToReminders: return "requestFullAccessToReminders (macOS 14+)"
-        case .requestAccess: return "requestAccess(to:) (before macOS 14)"
-        }
-    }
-}
-
 /// Something `doctor` found wrong. `code` is the stable contract; `message` and `suggestion` are
 /// prose. Deliberately not a `CLIError`: nothing is thrown, and these codes need no exit status.
 struct DoctorProblem: Encodable, Equatable {
@@ -134,7 +113,6 @@ struct DoctorReport: Encodable, Equatable {
     let binary: String
     let architecture: String
     let authorization: ReminderAuthorization
-    let accessRequestAPI: AccessRequestAPI
     let parentProcess: ParentProcess?
     let data: DoctorData?
 
@@ -150,7 +128,6 @@ struct DoctorReport: Encodable, Equatable {
                 label: "Parent process", value: parentProcess?.displayName ?? "unknown", problem: nil),
             DoctorCheck(
                 label: "Reminders access", value: authorization.label, problem: authorizationProblem),
-            DoctorCheck(label: "Access request API", value: accessRequestAPI.label, problem: nil),
         ]
         guard let data else {
             return checks
@@ -243,7 +220,7 @@ struct DoctorReport: Encodable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case version, macOS, binary, architecture, authorization, accessRequestAPI, parentProcess
+        case version, macOS, binary, architecture, authorization, parentProcess
         case sources, defaultList, listCount, openReminderCount, problems
     }
 
@@ -256,7 +233,6 @@ struct DoctorReport: Encodable, Equatable {
         try container.encode(binary, forKey: .binary)
         try container.encode(architecture, forKey: .architecture)
         try container.encode(authorization, forKey: .authorization)
-        try container.encode(accessRequestAPI, forKey: .accessRequestAPI)
         try container.encode(parentProcess?.name, forKey: .parentProcess)
         if let data {
             try container.encode(data.sources, forKey: .sources)

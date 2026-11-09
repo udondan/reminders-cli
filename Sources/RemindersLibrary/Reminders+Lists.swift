@@ -55,7 +55,6 @@ extension Reminders {
             binary: currentExecutablePath(),
             architecture: currentArchitecture,
             authorization: authorization,
-            accessRequestAPI: .current,
             parentProcess: detectParentProcess(),
             data: data)
 

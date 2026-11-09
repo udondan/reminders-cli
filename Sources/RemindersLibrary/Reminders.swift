@@ -66,18 +66,10 @@ public final class Reminders {
         let semaphore = DispatchSemaphore(value: 0)
         var grantedAccess = false
         var returnError: Error?
-        if #available(macOS 14.0, *) {
-            eventStore.requestFullAccessToReminders { granted, error in
-                grantedAccess = granted
-                returnError = error
-                semaphore.signal()
-            }
-        } else {
-            eventStore.requestAccess(to: .reminder) { granted, error in
-                grantedAccess = granted
-                returnError = error
-                semaphore.signal()
-            }
+        eventStore.requestFullAccessToReminders { granted, error in
+            grantedAccess = granted
+            returnError = error
+            semaphore.signal()
         }
 
         semaphore.wait()
