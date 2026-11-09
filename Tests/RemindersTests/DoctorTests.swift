@@ -12,8 +12,7 @@ final class DoctorTests: XCTestCase {
     ) -> DoctorReport {
         DoctorReport(
             version: "3.0.1", macOS: "15.4", macOSBuild: "24E248",
-            binary: "/opt/homebrew/bin/reminders", architecture: "arm64",
-            authorization: authorization, accessRequestAPI: .requestFullAccessToReminders,
+            binary: "/opt/homebrew/bin/reminders", architecture: "arm64", authorization: authorization,
             parentProcess: parentProcess, data: data)
     }
 
@@ -118,7 +117,6 @@ final class DoctorTests: XCTestCase {
                 "OK    Binary: /opt/homebrew/bin/reminders (arm64)",
                 "OK    Parent process: Terminal.app",
                 "OK    Reminders access: Full access",
-                "OK    Access request API: requestFullAccessToReminders (macOS 14+)",
                 "OK    Sources: iCloud (12 lists), Local (1 list)",
                 "OK    Default list: Reminders (iCloud)",
                 "OK    Reminders: 13 lists, 87 open reminders",
@@ -127,7 +125,7 @@ final class DoctorTests: XCTestCase {
 
     func testPlainOutputWithoutAccessSkipsDataChecksAndIndentsTheFix() {
         let lines = formatDoctorReport(report(authorization: .denied))
-        XCTAssertEqual(lines.count, 7)
+        XCTAssertEqual(lines.count, 6)
         XCTAssertEqual(lines[4], "FAIL  Reminders access: Denied")
         XCTAssertTrue(lines[5].hasPrefix("      Open System Settings"))
         XCTAssertFalse(lines.contains { $0.contains("Sources:") })
@@ -157,11 +155,10 @@ final class DoctorTests: XCTestCase {
         XCTAssertEqual(
             Set(json.keys),
             [
-                "version", "macOS", "binary", "architecture", "authorization", "accessRequestAPI",
+                "version", "macOS", "binary", "architecture", "authorization",
                 "parentProcess", "sources", "defaultList", "listCount", "openReminderCount", "problems",
             ])
         XCTAssertEqual(json["authorization"] as? String, "fullAccess")
-        XCTAssertEqual(json["accessRequestAPI"] as? String, "requestFullAccessToReminders")
         XCTAssertEqual(json["parentProcess"] as? String, "Terminal")
         XCTAssertEqual(json["defaultList"] as? String, "Reminders")
         XCTAssertEqual(json["listCount"] as? Int, 13)

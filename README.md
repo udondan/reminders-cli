@@ -634,7 +634,6 @@ OK    Binary: /opt/homebrew/bin/reminders (arm64)
 OK    Parent process: Terminal.app
 FAIL  Reminders access: Denied
       Open System Settings > Privacy & Security > Reminders and enable access for Terminal.app (the app that launched this command). Then re-run.
-OK    Access request API: requestFullAccessToReminders (macOS 14+)
 $ echo $?
 1
 ```
@@ -652,7 +651,6 @@ is fine:
 ```console
 $ reminders doctor --format json
 {
-  "accessRequestAPI" : "requestFullAccessToReminders",
   "architecture" : "arm64",
   "authorization" : "denied",
   "binary" : "\/opt\/homebrew\/bin\/reminders",
@@ -722,7 +720,11 @@ own format and exit with `64`.
 
 ## Installation
 
-Requires macOS 12 (Monterey) or later.
+Requires macOS 14 (Sonoma) or later.
+
+On older macOS versions, use [3.5.5](https://github.com/udondan/reminders-cli/releases/tag/v3.5.5),
+the last release that supports macOS 10.15 (Catalina) and later. Download `reminders.tar.gz` from
+that release and install it as described in [From GitHub releases](#from-github-releases).
 
 ### With [Homebrew](http://brew.sh/)
 
