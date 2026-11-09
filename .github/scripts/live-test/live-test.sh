@@ -124,6 +124,10 @@ echo "--- complete/uncomplete"
 run complete "$list_id" "$id2" --format json >/dev/null
 assert_eq "completed hidden" "2" "$(run show "$list_id" --format json | jq length)"
 assert_eq "completed shown"  "3" "$(run show "$list_id" --include-completed --format json | jq length)"
+# A completed reminder can still be edited, and stays completed.
+edited_done=$(run edit --notes "after completion" --format json "$list_id" "$id2")
+assert_eq "edit completed notes" "after completion" "$(jqr .notes <<<"$edited_done")"
+assert_eq "edit keeps completed" "true" "$(jqr .isCompleted <<<"$edited_done")"
 run uncomplete "$list_id" "$id2" --format json >/dev/null
 assert_eq "uncompleted back" "3" "$(run show "$list_id" --format json | jq length)"
 
