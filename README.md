@@ -762,6 +762,12 @@ Install the Claude Code plugin with `claude plugin marketplace add udondan/skill
 directly from [skills/reminders-cli/SKILL.md](skills/reminders-cli/SKILL.md). Agents should always
 pass `--format json` and act on reminders by their stable ID, never by title.
 
+## Disclaimer
+
+This is an unofficial, independent open-source project and is not affiliated with or endorsed by
+Apple Inc. Apple, macOS and Reminders are trademarks of Apple Inc., registered in the U.S. and other
+countries. The names are used only to describe compatibility.
+
 [latest]: https://github.com/udondan/reminders-cli/releases/latest
 [tap]: https://github.com/udondan/homebrew-software
 [ci]: https://github.com/udondan/reminders-cli/actions/workflows/mr-test.yml
