@@ -16,7 +16,7 @@ struct ReminderFilter: Equatable {
     var flagged = false
     var displayOptions: DisplayOptions = .incomplete
     var sort: Sort = .none
-    var sortOrder: CustomSortOrder = .ascending
+    var sortOrder: SortOrder = .forward
 
     /// The fetched reminders that pass every filter, in the requested order. A date-only
     /// `dueBefore` means the whole local day, same rule as `--repeat-until`; `dueAfter` needs no

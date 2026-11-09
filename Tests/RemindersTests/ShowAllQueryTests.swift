@@ -29,7 +29,7 @@ final class ShowAllQueryTests: XCTestCase {
         XCTAssertNil(query.dueAfter)
         XCTAssertEqual(query.lists, [])
         XCTAssertEqual(query.sort, .dueDate)
-        XCTAssertEqual(query.sortOrder, .ascending)
+        XCTAssertEqual(query.sortOrder, .forward)
     }
 
     func testTodayWithoutOverdue() {
@@ -49,7 +49,7 @@ final class ShowAllQueryTests: XCTestCase {
         XCTAssertFalse(query.includeOverdue)
         XCTAssertFalse(query.overdue)
         XCTAssertEqual(query.sort, .dueDate)
-        XCTAssertEqual(query.sortOrder, .ascending)
+        XCTAssertEqual(query.sortOrder, .forward)
     }
 
     func testUpcomingWithCustomDays() throws {
@@ -68,13 +68,13 @@ final class ShowAllQueryTests: XCTestCase {
     func testListsAndSortArePassedThrough() {
         let lists = ["Work", "Soon"]
         for query in [
-            ShowAllQuery.today(lists: lists, sort: .priority, sortOrder: .descending, now: now, calendar: calendar),
-            ShowAllQuery.overdue(lists: lists, sort: .priority, sortOrder: .descending),
-            ShowAllQuery.upcoming(lists: lists, sort: .priority, sortOrder: .descending, now: now, calendar: calendar),
+            ShowAllQuery.today(lists: lists, sort: .priority, sortOrder: .reverse, now: now, calendar: calendar),
+            ShowAllQuery.overdue(lists: lists, sort: .priority, sortOrder: .reverse),
+            ShowAllQuery.upcoming(lists: lists, sort: .priority, sortOrder: .reverse, now: now, calendar: calendar),
         ] {
             XCTAssertEqual(query.lists, lists)
             XCTAssertEqual(query.sort, .priority)
-            XCTAssertEqual(query.sortOrder, .descending)
+            XCTAssertEqual(query.sortOrder, .reverse)
         }
     }
 }

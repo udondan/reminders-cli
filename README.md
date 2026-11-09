@@ -722,6 +722,8 @@ own format and exit with `64`.
 
 ## Installation
 
+Requires macOS 12 (Monterey) or later.
+
 ### With [Homebrew](http://brew.sh/)
 
 ```console

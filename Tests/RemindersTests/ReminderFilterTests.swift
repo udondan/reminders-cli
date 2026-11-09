@@ -27,7 +27,7 @@ final class ReminderFilterTests: XCTestCase {
         let filter = ReminderFilter()
         XCTAssertEqual(filter.displayOptions, .incomplete)
         XCTAssertEqual(filter.sort, Sort.none)
-        XCTAssertEqual(filter.sortOrder, .ascending)
+        XCTAssertEqual(filter.sortOrder, .forward)
 
         let fetched = [makeReminder("b", dueIn: 2), makeReminder("a"), makeReminder("c", dueIn: -1)]
         XCTAssertEqual(titles(filter.apply(to: fetched, now: now)), ["b", "a", "c"])
@@ -38,7 +38,7 @@ final class ReminderFilterTests: XCTestCase {
         XCTAssertEqual(
             titles(ReminderFilter(sort: .dueDate).apply(to: fetched, now: now)), ["sooner", "later"])
         XCTAssertEqual(
-            titles(ReminderFilter(sort: .dueDate, sortOrder: .descending).apply(to: fetched, now: now)),
+            titles(ReminderFilter(sort: .dueDate, sortOrder: .reverse).apply(to: fetched, now: now)),
             ["later", "sooner"])
     }
 
