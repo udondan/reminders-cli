@@ -157,8 +157,10 @@ public final class Reminders {
         outputFormat: OutputFormat) throws
     {
         let calendar = try self.calendar(withNameOrId: nameOrId)
+        // Completed reminders can be edited too (e.g. notes added after ticking one
+        // off); editing never changes the completion state.
         let reminders = try resolveReminders(
-            self.fetchReminders(on: [calendar], displayOptions: .incomplete),
+            self.fetchReminders(on: [calendar], displayOptions: .all),
             idsOrPrefixes: selection.ids, onList: nameOrId)
         let newCalendar = try newListName.map { try self.calendar(withNameOrId: $0) }
 

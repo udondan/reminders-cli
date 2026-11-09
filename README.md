@@ -223,6 +223,8 @@ $ reminders show Soon
 
 ### Edit an item on a list
 
+Completed reminders can be edited too; their completion state is kept.
+
 ```console
 $ reminders edit Soon 2A29C8B1-3D0F-4A9E-9C8D-5B6E7F8A9B0C Some edited text
 Updated reminder 'Some edited text'
