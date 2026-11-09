@@ -1,5 +1,14 @@
 # Changelog
 
+## [3.5.6](https://github.com/udondan/reminders-cli/compare/v3.5.5...v3.5.6) (2026-11-09)
+
+
+### Bug Fixes
+
+* escape list names in shell completion per shell ([#129](https://github.com/udondan/reminders-cli/issues/129)) ([06497c7](https://github.com/udondan/reminders-cli/commit/06497c7ffd729a51bc52d0989a8aec8a8aaf3e48)), closes [#126](https://github.com/udondan/reminders-cli/issues/126)
+* find completed reminders in edit ([#136](https://github.com/udondan/reminders-cli/issues/136)) ([c6ebf09](https://github.com/udondan/reminders-cli/commit/c6ebf095df762d9fbb92109be00308edab934d55)), closes [#102](https://github.com/udondan/reminders-cli/issues/102)
+* parse "this weekend" and "next weekend" as due dates ([#128](https://github.com/udondan/reminders-cli/issues/128)) ([a211fd2](https://github.com/udondan/reminders-cli/commit/a211fd23da8e6d40ae90f0e2815f9337855db682)), closes [#125](https://github.com/udondan/reminders-cli/issues/125)
+
 ## [3.5.5](https://github.com/udondan/reminders-cli/compare/v3.5.4...v3.5.5) (2026-10-30)
 
 Only development dependencies were updated. Nothing changed for users.
