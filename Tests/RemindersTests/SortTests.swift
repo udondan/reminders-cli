@@ -29,7 +29,7 @@ final class SortTests: XCTestCase {
         return reminder
     }
 
-    private func titles(_ reminders: [EKReminder], sort: Sort, order: CustomSortOrder) -> [String] {
+    private func titles(_ reminders: [EKReminder], sort: Sort, order: SortOrder) -> [String] {
         reminders.sorted(by: sort.sortFunction(order: order)).map { $0.title! }
     }
 
@@ -39,7 +39,7 @@ final class SortTests: XCTestCase {
         let low = makeReminder(title: "low", priority: .low)
         let none = makeReminder(title: "none", priority: .none)
 
-        let result = titles([none, low, high, medium], sort: .priority, order: .ascending)
+        let result = titles([none, low, high, medium], sort: .priority, order: .forward)
         XCTAssertEqual(result, ["high", "medium", "low", "none"])
     }
 
@@ -49,7 +49,7 @@ final class SortTests: XCTestCase {
         let low = makeReminder(title: "low", priority: .low)
         let none = makeReminder(title: "none", priority: .none)
 
-        let result = titles([none, low, high, medium], sort: .priority, order: .descending)
+        let result = titles([none, low, high, medium], sort: .priority, order: .reverse)
         XCTAssertEqual(result, ["none", "low", "medium", "high"])
     }
 
@@ -58,16 +58,16 @@ final class SortTests: XCTestCase {
         let later = makeReminder(title: "later", due: now.addingTimeInterval(3600), priority: .high)
 
         XCTAssertEqual(
-            titles([later, earlier], sort: .priority, order: .ascending), ["earlier", "later"])
+            titles([later, earlier], sort: .priority, order: .forward), ["earlier", "later"])
         XCTAssertEqual(
-            titles([later, earlier], sort: .priority, order: .descending), ["earlier", "later"])
+            titles([later, earlier], sort: .priority, order: .reverse), ["earlier", "later"])
     }
 
     func testPriorityTieWithNoDueDateOnEitherSideIsATie() throws {
         let a = makeReminder(title: "a", priority: .none)
         let b = makeReminder(title: "b", priority: .none)
 
-        for order in CustomSortOrder.allCases {
+        for order in [SortOrder.forward, .reverse] {
             let areInIncreasingOrder = Sort.priority.sortFunction(order: order)
             XCTAssertFalse(areInIncreasingOrder(a, b), "\(order)")
             XCTAssertFalse(areInIncreasingOrder(b, a), "\(order)")
@@ -78,7 +78,7 @@ final class SortTests: XCTestCase {
         let due = makeReminder(title: "due", due: now)
         let noDue = makeReminder(title: "no-due")
 
-        let result = titles([noDue, due], sort: .dueDate, order: .ascending)
+        let result = titles([noDue, due], sort: .dueDate, order: .forward)
         XCTAssertEqual(result, ["due", "no-due"])
     }
 
@@ -86,7 +86,7 @@ final class SortTests: XCTestCase {
         let due = makeReminder(title: "due", due: now)
         let noDue = makeReminder(title: "no-due")
 
-        let result = titles([noDue, due], sort: .dueDate, order: .descending)
+        let result = titles([noDue, due], sort: .dueDate, order: .reverse)
         XCTAssertEqual(result, ["due", "no-due"])
     }
 
@@ -98,9 +98,9 @@ final class SortTests: XCTestCase {
         let shuffled = [second, noDue, third, first]
 
         XCTAssertEqual(
-            titles(shuffled, sort: .dueDate, order: .ascending), ["first", "second", "third", "no-due"])
+            titles(shuffled, sort: .dueDate, order: .forward), ["first", "second", "third", "no-due"])
         XCTAssertEqual(
-            titles(shuffled, sort: .dueDate, order: .descending), ["third", "second", "first", "no-due"])
+            titles(shuffled, sort: .dueDate, order: .reverse), ["third", "second", "first", "no-due"])
     }
 
     func testCreationDateOrdersBothWays() throws {
@@ -109,8 +109,8 @@ final class SortTests: XCTestCase {
         let new = makeReminder(title: "new", created: now)
         let shuffled = [middle, new, old]
 
-        XCTAssertEqual(titles(shuffled, sort: .creationDate, order: .ascending), ["old", "middle", "new"])
-        XCTAssertEqual(titles(shuffled, sort: .creationDate, order: .descending), ["new", "middle", "old"])
+        XCTAssertEqual(titles(shuffled, sort: .creationDate, order: .forward), ["old", "middle", "new"])
+        XCTAssertEqual(titles(shuffled, sort: .creationDate, order: .reverse), ["new", "middle", "old"])
     }
 
     func testPriorityMixedSetOrdersEndToEnd() throws {
@@ -124,10 +124,21 @@ final class SortTests: XCTestCase {
 
         let result = titles(
             [noneNoDue, low, highLater, medium, noneWithDue, highEarlier, highNoDue],
-            sort: .priority, order: .ascending)
+            sort: .priority, order: .forward)
 
         XCTAssertEqual(
             result,
             ["high-earlier", "high-later", "high-no-due", "medium", "low", "none-with-due", "none-no-due"])
+    }
+
+    func testSortOrderArgumentKeepsAscendingAndDescending() {
+        XCTAssertEqual(SortOrder(argument: "ascending"), .forward)
+        XCTAssertEqual(SortOrder(argument: "descending"), .reverse)
+        XCTAssertNil(SortOrder(argument: "forward"))
+        XCTAssertNil(SortOrder(argument: "Ascending"))
+        XCTAssertEqual(SortOrder.allValueStrings, ["ascending", "descending"])
+        XCTAssertEqual(SortOrder.commaSeparatedCases, "ascending, descending")
+        XCTAssertEqual(SortOrder.forward.defaultValueDescription, "ascending")
+        XCTAssertEqual(SortOrder.reverse.defaultValueDescription, "descending")
     }
 }

@@ -96,13 +96,6 @@ match.rules = ["checkov:CKV_GHA_7"]
 match.file_patterns = [".github/workflows/publish.yml"]
 set.ignored = true
 
-# Known TODO, tracked in https://github.com/udondan/reminders-cli/issues/124
-# (CustomSortOrder until macOS 12 is the minimum). Remove this entry with the TODO.
-[[triage]]
-match.rules = ["ripgrep:TODO"]
-match.file_patterns = ["Sources/RemindersLibrary/Sort.swift"]
-set.ignored = true
-
 # The NOTE in testTonight explains why the test only asserts "evening, on the hour"; it's not an
 # open task.
 [[triage]]

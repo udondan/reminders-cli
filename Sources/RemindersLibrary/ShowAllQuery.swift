@@ -12,7 +12,7 @@ struct ShowAllQuery: Equatable {
     var dueAfter: DateComponents?
     var lists: [String] = []
     var sort: Sort = .dueDate
-    var sortOrder: CustomSortOrder = .ascending
+    var sortOrder: SortOrder = .forward
 
     /// The query's filters, over incomplete reminders only.
     var filter: ReminderFilter {
@@ -24,7 +24,7 @@ struct ShowAllQuery: Equatable {
     /// `show-all --due-date today --include-overdue --sort due-date`.
     static func today(
         includeOverdue: Bool = true, lists: [String] = [], sort: Sort = .dueDate,
-        sortOrder: CustomSortOrder = .ascending, now: Date = Date(), calendar: Calendar = .current
+        sortOrder: SortOrder = .forward, now: Date = Date(), calendar: Calendar = .current
     ) -> ShowAllQuery {
         return ShowAllQuery(
             dueOn: dateOnlyComponents(of: now, in: calendar), includeOverdue: includeOverdue,
@@ -33,7 +33,7 @@ struct ShowAllQuery: Equatable {
 
     /// `show-all --overdue --sort due-date`.
     static func overdue(
-        lists: [String] = [], sort: Sort = .dueDate, sortOrder: CustomSortOrder = .ascending
+        lists: [String] = [], sort: Sort = .dueDate, sortOrder: SortOrder = .forward
     ) -> ShowAllQuery {
         return ShowAllQuery(overdue: true, lists: lists, sort: sort, sortOrder: sortOrder)
     }
@@ -44,7 +44,7 @@ struct ShowAllQuery: Equatable {
     /// lets past-due reminders through, and the due-date sort lists them first.
     static func upcoming(
         days: Int = 7, includeOverdue: Bool = false, lists: [String] = [], sort: Sort = .dueDate,
-        sortOrder: CustomSortOrder = .ascending, now: Date = Date(), calendar: Calendar = .current
+        sortOrder: SortOrder = .forward, now: Date = Date(), calendar: Calendar = .current
     ) -> ShowAllQuery {
         let lastDay = calendar.date(byAdding: .day, value: days, to: now) ?? now
         return ShowAllQuery(

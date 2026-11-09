@@ -1,5 +1,6 @@
 import ArgumentParser
 import EventKit
+import Foundation
 
 public enum Sort: String, Decodable, ExpressibleByArgument, CaseIterable {
     case none
@@ -9,8 +10,8 @@ public enum Sort: String, Decodable, ExpressibleByArgument, CaseIterable {
 
     public static let commaSeparatedCases = Self.allCases.map { $0.rawValue }.joined(separator: ", ")
 
-    func sortFunction(order: CustomSortOrder) -> (EKReminder, EKReminder) -> Bool {
-        let comparison: (Date, Date) -> Bool = order == .ascending ? (<) : (>)
+    func sortFunction(order: SortOrder) -> (EKReminder, EKReminder) -> Bool {
+        let comparison: (Date, Date) -> Bool = order == .forward ? (<) : (>)
         switch self {
         case .none: return { _, _ in fatalError() }
         case .creationDate: return { comparison($0.creationDate!, $1.creationDate!) }
@@ -19,7 +20,7 @@ public enum Sort: String, Decodable, ExpressibleByArgument, CaseIterable {
             let rankA = priorityRank($0)
             let rankB = priorityRank($1)
             if rankA != rankB {
-                return order == .ascending ? rankA < rankB : rankA > rankB
+                return order == .forward ? rankA < rankB : rankA > rankB
             }
             // Ties are always broken by due date ascending, regardless of --sort-order.
             return dueDateComparison($0, $1, using: (<))
@@ -52,12 +53,26 @@ private func dueDateComparison(
     }
 }
 
-// TODO(#124): Replace with SortOrder when we drop < macOS 12.0
-public enum CustomSortOrder: String, Decodable, ExpressibleByArgument, CaseIterable {
-    case ascending
-    case descending
+/// `--sort-order` reads Foundation's `SortOrder` as `ascending` (`.forward`) or `descending`
+/// (`.reverse`). Qualifying both the type and the protocol with their modules declares the
+/// conformance retroactive without `@retroactive` (which older compilers reject) and without the
+/// newer compilers' warning about it, which would fail `-warnings-as-errors`.
+extension Foundation.SortOrder: ArgumentParser.ExpressibleByArgument {
+    public init?(argument: String) {
+        switch argument {
+        case "ascending": self = .forward
+        case "descending": self = .reverse
+        default: return nil
+        }
+    }
 
-    public static let commaSeparatedCases = Self.allCases.map { $0.rawValue }.joined(separator: ", ")
+    public static var allValueStrings: [String] { ["ascending", "descending"] }
+
+    public static var defaultCompletionKind: CompletionKind { .list(allValueStrings) }
+
+    public var defaultValueDescription: String { self == .forward ? "ascending" : "descending" }
+
+    public static var commaSeparatedCases: String { allValueStrings.joined(separator: ", ") }
 }
 
 /// Ordering for `show-lists`. `none` keeps EventKit's order, `name` sorts case-insensitively

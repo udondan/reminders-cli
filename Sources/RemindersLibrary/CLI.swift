@@ -62,8 +62,8 @@ private struct ReminderFilterOptions: ParsableArguments {
 
     @Option(
         name: [.customShort("o"), .long],
-        help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
-    var sortOrder: CustomSortOrder = .ascending
+        help: "How the sort order should be applied, one of: \(SortOrder.commaSeparatedCases)")
+    var sortOrder: SortOrder = .forward
 
     @Option(
         name: .shortAndLong,
@@ -173,8 +173,8 @@ private struct Today: FormattedCommand {
 
     @Option(
         name: [.customShort("o"), .long],
-        help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
-    var sortOrder: CustomSortOrder = .ascending
+        help: "How the sort order should be applied, one of: \(SortOrder.commaSeparatedCases)")
+    var sortOrder: SortOrder = .forward
 
     @OptionGroup
     var listing: ListingOptions
@@ -204,8 +204,8 @@ private struct Overdue: FormattedCommand {
 
     @Option(
         name: [.customShort("o"), .long],
-        help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
-    var sortOrder: CustomSortOrder = .ascending
+        help: "How the sort order should be applied, one of: \(SortOrder.commaSeparatedCases)")
+    var sortOrder: SortOrder = .forward
 
     @OptionGroup
     var listing: ListingOptions
@@ -242,8 +242,8 @@ private struct Upcoming: FormattedCommand {
 
     @Option(
         name: [.customShort("o"), .long],
-        help: "How the sort order should be applied, one of: \(CustomSortOrder.commaSeparatedCases)")
-    var sortOrder: CustomSortOrder = .ascending
+        help: "How the sort order should be applied, one of: \(SortOrder.commaSeparatedCases)")
+    var sortOrder: SortOrder = .forward
 
     @OptionGroup
     var listing: ListingOptions
