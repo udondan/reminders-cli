@@ -13,7 +13,30 @@ on:
 permissions: {}
 
 jobs:
+  # Queues the runs of pull requests and main, pull requests first, so only one
+  # run is tested at a time. Pull requests from forks get a read-only token and
+  # skip the wait.
+  boarding-gate:
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      actions: read
+      contents: write # lock refs under refs/boarding-gate/
+      pull-requests: read # labels for label-weights
+      statuses: write # queue position as commit status
+    # Queue order, the concurrency group that cancels outdated waiting runs and
+    # the rebase of branches that are behind main: see
+    # https://github.com/udondan/boarding-gate#reusable-workflow
+    # The rebase needs OVERRIDE_TOKEN: pushes with github.token don't start new runs.
+    uses: udondan/boarding-gate/.github/workflows/boarding-gate.yml@v1
+    secrets:
+      update-token: ${{ secrets.OVERRIDE_TOKEN }}
+
   build:
+    needs: boarding-gate
+    # The wait is skipped for forks.
+    if: ${{ !cancelled() && (needs.boarding-gate.result == 'success' || needs.boarding-gate.result == 'skipped') }}
     runs-on: macos-26
     permissions:
       contents: read
@@ -146,6 +169,9 @@ jobs:
     # because hosted runners disable SIP, which lets us grant Reminders access without the prompt.
     # The binary is built with coverage instrumentation, and its coverage is uploaded together
     # with the unit tests' by upload-coverage.
+    needs: boarding-gate
+    # The wait is skipped for forks.
+    if: ${{ !cancelled() && (needs.boarding-gate.result == 'success' || needs.boarding-gate.result == 'skipped') }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -247,7 +273,7 @@ jobs:
 
   # The only test check the ruleset requires, whatever jobs are added later.
   required:
-    needs: [build, upload-coverage, coverage, live-test, skill-docs, lint]
+    needs: [boarding-gate, build, upload-coverage, coverage, live-test, skill-docs, lint]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}
