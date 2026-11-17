@@ -24,6 +24,8 @@ The `qlty` job in the same workflow runs `qlty check --all` with the security pl
 
 Coverage on Codecov combines two sources: the unit tests, and an instrumented build that the `live-test` job in `.github/workflows/mr-test.yml` runs through `.github/scripts/live-test/live-test.sh` against a real store on a runner. The `upload-coverage` job merges both into one upload, so code that needs the EventKit store (the `Reminders` methods and the subcommands' `run()`) is covered by extending `live-test.sh` on its throwaway lists, not by unit tests.
 
+In `mr-test.yml` every job waits for boarding-gate (the `Queue` job) and fails if it failed, so nothing runs in parallel while another run holds the turn. On pull requests, `build` only runs if the `changes` job (`dorny/paths-filter`) found a changed code or build file (add new files the build or tests depend on to its filter), and `live-test` only runs after `build` passed. Pushes to main always run them. `skill-docs` and the linters of `lint.yml` run on every pull request.
+
 ## Architecture
 
 Execution flows in one direction through four layers:
