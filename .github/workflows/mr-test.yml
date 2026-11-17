@@ -280,7 +280,7 @@ jobs:
     # A reusable workflow can't fail in a first step: skip it instead if
     # boarding-gate failed, the required job then fails on that result.
     if: ${{ !cancelled() && needs.boarding-gate.result != 'failure' && needs.boarding-gate.result != 'cancelled' }}
-    uses: ./.github/workflows/lint.yml
+    uses: $/.github/workflows/lint.yml
     permissions:
       contents: read
 
