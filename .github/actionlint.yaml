@@ -1,3 +1,4 @@
+---
 # actionlint doesn't know the self-repository syntax `uses: $/...` yet, which
 # runs a workflow of this repository at the running commit.
 paths:
