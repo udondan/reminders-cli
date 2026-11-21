@@ -1,0 +1,125 @@
+---
+name: Publish
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag of the draft release to attach the tarball to and publish
+        type: string
+        required: true
+      ref:
+        description: Commit to build
+        type: string
+        required: true
+    secrets:
+      OVERRIDE_TOKEN:
+        description: Token for the release and the push to the Homebrew tap
+        required: true
+      EMAIL:
+        description: Commit email for the Homebrew tap
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of an existing draft release to attach the tarball to and publish (leave empty to only build)
+        type: string
+        required: false
+        default: ""
+      ref:
+        description: Commit to build (defaults to the tag, or the default branch when no tag is given)
+        type: string
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref || inputs.tag }}
+          persist-credentials: false
+
+      - name: Package
+        run: make package
+
+      - name: Checksum
+        id: checksum
+        run: echo "sha256=$(shasum -a 256 reminders.tar.gz | awk '{print $1}')" >> "$GITHUB_OUTPUT"
+
+      - name: Verify release is a draft
+        if: inputs.tag != ''
+        run: |
+          if [ "$(gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" --json isDraft --jq .isDraft)" != "true" ]; then
+            echo "::error::Release ${TAG} is already published; assets cannot be added to an immutable release."
+            exit 1
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.OVERRIDE_TOKEN }}
+          TAG: ${{ inputs.tag }}
+
+      - name: Attach artifact to draft release
+        if: inputs.tag != ''
+        run: gh release upload "${TAG}" reminders.tar.gz --clobber --repo "${GITHUB_REPOSITORY}"
+        env:
+          GH_TOKEN: ${{ secrets.OVERRIDE_TOKEN }}
+          TAG: ${{ inputs.tag }}
+
+      - name: Publish release
+        if: inputs.tag != ''
+        run: gh release edit "${TAG}" --draft=false --latest --repo "${GITHUB_REPOSITORY}"
+        env:
+          GH_TOKEN: ${{ secrets.OVERRIDE_TOKEN }}
+          TAG: ${{ inputs.tag }}
+
+      - name: Checkout homebrew tap
+        if: inputs.tag != ''
+        uses: actions/checkout@v7
+        with:
+          repository: udondan/homebrew-software
+          token: ${{ secrets.OVERRIDE_TOKEN }}
+          path: homebrew-software
+          # The formula update below pushes with these credentials.
+          persist-credentials: true
+
+      - name: Update homebrew formula
+        if: inputs.tag != ''
+        working-directory: homebrew-software
+        run: |
+          VERSION="${TAG}"
+
+          echo "${TEMPLATE}" | sed \
+            -e "s!{{ version }}!${VERSION#v}!g" \
+            -e "s!{{ sha256 }}!${SHA256}!g" \
+            > reminders-cli.rb
+          cat reminders-cli.rb
+
+          git config --global user.email "${EMAIL}"
+          git config --global user.name "udondan"
+          git add reminders-cli.rb
+          git commit -m "Release ${VERSION#v}"
+          git push
+        env:
+          TAG: ${{ inputs.tag }}
+          SHA256: ${{ steps.checksum.outputs.sha256 }}
+          EMAIL: ${{ secrets.EMAIL }}
+          TEMPLATE: |
+            class RemindersCli < Formula
+              desc "Interact with macOS Reminders from the command line"
+              homepage "https://github.com/udondan/reminders-cli"
+              version "{{ version }}"
+              license "MIT"
+              url "https://github.com/udondan/reminders-cli/releases/download/v{{ version }}/reminders.tar.gz"
+              sha256 "{{ sha256 }}"
+
+              depends_on macos: :sonoma
+
+              def install
+                bin.install "reminders"
+                generate_completions_from_executable(bin/"reminders", "--generate-completion-script")
+              end
+            end

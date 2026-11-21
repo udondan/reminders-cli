@@ -1,0 +1,296 @@
+---
+name: Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+# Each job asks for the permissions it needs.
+permissions: {}
+
+jobs:
+  # Queues the runs of pull requests and main, pull requests first, so only one
+  # run is tested at a time. Pull requests from forks get a read-only token and
+  # skip the wait.
+  boarding-gate:
+    name: Queue
+    if: >-
+      github.event_name == 'push' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    permissions:
+      actions: read
+      contents: write # lock refs under refs/boarding-gate/
+      pull-requests: read # labels for label-weights
+      statuses: write # queue position as commit status
+    # Queue order, the concurrency group that cancels outdated waiting runs and
+    # the rebase of branches that are behind main: see
+    # https://github.com/udondan/boarding-gate#reusable-workflow
+    # The rebase needs OVERRIDE_TOKEN: pushes with github.token don't start new runs.
+    uses: udondan/boarding-gate/.github/workflows/boarding-gate.yml@v1
+    secrets:
+      update-token: ${{ secrets.OVERRIDE_TOKEN }}
+
+  # The build and the live test only run if code or build config changed.
+  # Skipped outside of pull requests, so pushes to main always run them. Waits
+  # for boarding-gate like everything else: while another run holds the turn,
+  # this one likely needs a rebase anyway.
+  changes:
+    needs: boarding-gate
+    # A skipped job counts as passed for required checks. Run the job even if
+    # boarding-gate failed and fail it in the first step. The wait is skipped
+    # for forks.
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read # paths-filter lists the PR's files via the API
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Check turn
+        if: needs.boarding-gate.result == 'failure' || needs.boarding-gate.result == 'cancelled'
+        run: exit 1
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          filters: |
+            code:
+              - Sources/**
+              - Tests/**
+              - .github/scripts/live-test/**
+              - .github/workflows/mr-test.yml
+              - Makefile
+              - Package.swift
+              - Package.resolved
+
+  build:
+    needs: [boarding-gate, changes]
+    # Skip if no code changed. Otherwise fail instead of skip if boarding-gate
+    # failed, see the changes job.
+    if: ${{ !cancelled() && (needs.changes.result == 'skipped' || (needs.changes.result == 'success' && needs.changes.outputs.code == 'true')) }}
+    runs-on: macos-26
+    permissions:
+      contents: read
+    steps:
+      - name: Check turn
+        if: needs.boarding-gate.result == 'failure' || needs.boarding-gate.result == 'cancelled'
+        run: exit 1
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build
+        run: swift build -Xswiftc -warnings-as-errors
+
+      - name: Test
+        run: swift test -Xswiftc -warnings-as-errors --enable-code-coverage
+
+      - name: Export coverage
+        run: |
+          codecov_dir=$(dirname "$(swift test --show-codecov-path)")
+          bin_path=$(swift build --show-bin-path)
+          bundle=$(find "$bin_path" -maxdepth 1 -name '*.xctest' | head -n 1)
+          xcrun llvm-cov export -format=lcov \
+            -instr-profile "$codecov_dir/default.profdata" \
+            -ignore-filename-regex '\.build/|Tests/' \
+            "$bundle/Contents/MacOS/$(basename "$bundle" .xctest)" \
+            | sed "s|^SF:$GITHUB_WORKSPACE/|SF:|" > lcov-unit.info
+
+      - name: Keep coverage for the upload job
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-unit
+          path: lcov-unit.info
+          if-no-files-found: error
+
+      - name: Package
+        run: make package
+
+  # The unit tests can't reach the EventKit store I/O; the live test runs it. Both coverage reports
+  # go to Codecov in one upload, so Codecov computes its status once, from the merged data.
+  upload-coverage:
+    runs-on: ubuntu-latest
+    needs: [build, live-test]
+    if: always() && needs.build.result == 'success'
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: coverage-*
+          merge-multiple: true
+
+      - name: List coverage reports
+        id: files
+        run: |
+          files=$(find . -maxdepth 1 -name 'lcov-*.info' | sort | paste -sd, -)
+          echo "Coverage reports: $files"
+          echo "files=$files" >> "$GITHUB_OUTPUT"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          use_oidc: true
+          fail_ci_if_error: false
+          disable_search: true
+          files: ${{ steps.files.outputs.files }}
+
+  # Codecov reports its result as the check runs codecov/project and
+  # codecov/patch. This job waits for them, so a coverage drop fails the
+  # required job. It is skipped along with the tests, e.g. when only the README
+  # changes, and passes with a warning if Codecov doesn't report in time.
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    needs: [build, upload-coverage]
+    if: always() && github.event_name == 'pull_request' && needs.upload-coverage.result == 'success'
+    timeout-minutes: 10
+    permissions:
+      checks: read
+    steps:
+      - name: Wait for Codecov
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          for _ in $(seq 30); do
+            checks=$(gh api --paginate --slurp "repos/$REPO/commits/$SHA/check-runs?per_page=100" | jq -c '
+              [.[].check_runs[] | select(.app.slug == "codecov" and (.name == "codecov/project" or .name == "codecov/patch"))]
+              | group_by(.name) | map(max_by(.id))')
+            if [[ $(jq '[.[] | select(.status == "completed")] | length' <<<"$checks") == 2 ]]; then
+              jq -r '.[] | "\(.name): \(.conclusion) (\(.output.title))"' <<<"$checks"
+              failed=$(jq -r '.[] | select(.conclusion != "success" and .conclusion != "neutral") | .name' <<<"$checks")
+              if [[ -n "$failed" ]]; then
+                echo "::error::Coverage check failed: ${failed//$'\n'/, }. Details are linked in the checks of this pull request."
+                exit 1
+              fi
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::warning::Codecov didn't report within 5 minutes, coverage is not checked."
+
+  live-test:
+    # Exercises the real EventKit store end to end against a throwaway list, covering the store
+    # I/O the unit tests can't reach (fetch, save, commit, create and delete lists). It only works
+    # because hosted runners disable SIP, which lets us grant Reminders access without the prompt.
+    # The binary is built with coverage instrumentation, and its coverage is uploaded together
+    # with the unit tests' by upload-coverage.
+    # Only runs if the build and unit tests passed: they are skipped if no code
+    # changed, and if they failed, the required job fails on their result.
+    needs: [boarding-gate, build]
+    if: ${{ !cancelled() && needs.build.result == 'success' }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15, macos-26]
+    permissions:
+      contents: read
+    env:
+      # The test asserts exact UTC due dates from timezone-free date strings, so pin the runner's
+      # timezone rather than depend on it defaulting to UTC.
+      TZ: UTC
+      # %p: one profile per process, merged after the test.
+      LLVM_PROFILE_FILE: ${{ github.workspace }}/.build/live-coverage/%p.profraw
+    steps:
+      - name: Check turn
+        if: needs.boarding-gate.result == 'failure' || needs.boarding-gate.result == 'cancelled'
+        run: exit 1
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Build
+        # The flags --enable-code-coverage adds to `swift test`.
+        run: swift build -Xswiftc -profile-generate -Xswiftc -profile-coverage-mapping
+
+      - name: Grant Reminders access
+        run: bash .github/scripts/live-test/grant-reminders-access.sh .build/debug/reminders
+
+      # The live test completes a list name in each shell; the system bash (3.2) is too old for
+      # the generated completion script.
+      - name: Install bash and fish
+        run: |
+          for shell in bash fish; do
+            [ -x "$(brew --prefix)/bin/$shell" ] || brew install "$shell"
+          done
+
+      - name: Live test
+        timeout-minutes: 5
+        run: |
+          set +e
+          bash .github/scripts/live-test/live-test.sh .build/debug/reminders
+          code=$?
+          if [ "$code" = 20 ]; then
+            echo "::warning::Skipped: this runner has no reminder source to hold a new list."
+            exit 0
+          fi
+          exit $code
+
+      # Also after a failed test, so the coverage of what did run still counts.
+      - name: Export coverage
+        if: always()
+        run: |
+          xcrun llvm-profdata merge -sparse .build/live-coverage/*.profraw -o live.profdata
+          xcrun llvm-cov export -format=lcov \
+            -instr-profile live.profdata \
+            -ignore-filename-regex '\.build/|Tests/' \
+            .build/debug/reminders \
+            | sed "s|^SF:$GITHUB_WORKSPACE/|SF:|" > "lcov-live-${{ matrix.os }}.info"
+
+      - name: Keep coverage for the upload job
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-live-${{ matrix.os }}
+          path: lcov-live-${{ matrix.os }}.info
+          if-no-files-found: error
+
+  skill-docs:
+    needs: boarding-gate
+    # Fail instead of skip if boarding-gate failed, see the changes job.
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check turn
+        if: needs.boarding-gate.result == 'failure' || needs.boarding-gate.result == 'cancelled'
+        run: exit 1
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Check SKILL.md JSON field table against EncodingKeys
+        run: bash .github/scripts/check-skill-json-fields.sh
+
+  lint:
+    needs: boarding-gate
+    # A reusable workflow can't fail in a first step: skip it instead if
+    # boarding-gate failed, the required job then fails on that result.
+    if: ${{ !cancelled() && needs.boarding-gate.result != 'failure' && needs.boarding-gate.result != 'cancelled' }}
+    uses: $/.github/workflows/lint.yml
+    permissions:
+      contents: read
+
+  # The only test check the ruleset requires, whatever jobs are added later.
+  required:
+    needs: [boarding-gate, changes, build, upload-coverage, coverage, live-test, skill-docs, lint]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    steps:
+      - name: Check result
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

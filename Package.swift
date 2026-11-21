@@ -1,0 +1,33 @@
+// swift-tools-version:5.9
+import PackageDescription
+
+let package = Package(
+    name: "reminders",
+    platforms: [
+        .macOS(.v14)
+    ],
+    products: [
+        .executable(name: "reminders", targets: ["reminders"]),
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-argument-parser", .upToNextMajor(from: "1.8.2")),
+    ],
+    targets: [
+        .executableTarget(
+            name: "reminders",
+            dependencies: ["RemindersLibrary"],
+            swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]
+        ),
+        .target(
+            name: "RemindersLibrary",
+            dependencies: [
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            swiftSettings: [.unsafeFlags(["-warnings-as-errors"])]
+        ),
+        .testTarget(
+            name: "RemindersTests",
+            dependencies: ["RemindersLibrary"]
+        ),
+    ]
+)
