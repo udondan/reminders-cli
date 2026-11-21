@@ -10,6 +10,9 @@
 [![Maintainability](https://qlty.sh/gh/udondan/projects/reminders-cli/maintainability.svg)][qlty]
 [![License](https://img.shields.io/github/license/udondan/reminders-cli)][license]
 
+> [!NOTE]
+> Unofficial community project. Not affiliated with, endorsed or authorized by Apple.
+
 A CLI for Apple Reminders on macOS: list, add, edit, complete, postpone and delete reminders from
 the terminal or a script, with JSON output and stable reminder IDs.
 
@@ -766,7 +769,9 @@ pass `--format json` and act on reminders by their stable ID, never by title.
 
 This is an unofficial, independent open-source project and is not affiliated with or endorsed by
 Apple Inc. Apple, macOS and Reminders are trademarks of Apple Inc., registered in the U.S. and other
-countries. The names are used only to describe compatibility.
+countries. The names are used only to describe compatibility. Use at your own risk: commands such as
+`delete` change your reminders, and Apple may change the Reminders behavior this tool relies on at
+any time.
 
 [latest]: https://github.com/udondan/reminders-cli/releases/latest
 [tap]: https://github.com/udondan/homebrew-software
