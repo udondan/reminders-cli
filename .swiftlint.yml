@@ -1,0 +1,39 @@
+---
+included:
+  - Sources
+  - Tests
+  - Package.swift
+excluded:
+  - .build
+
+disabled_rules:
+  # Business logic lives in Reminders.swift and the subcommands in CLI.swift by design (see
+  # CLAUDE.md), and test cases group every test of one area in a single class.
+  - file_length
+  - type_body_length
+  # The testable free functions (configureNewReminder, applyEdit, ...) take each option as its own
+  # defaulted parameter, so callers and tests set only what they need.
+  - function_parameter_count
+  # TODOs here record upstream limitations (Apple feedback, minimum macOS version), not open work.
+  - todo
+
+# Trailing commas in multi-line literals are the codebase's style: they keep diffs to one line.
+trailing_comma:
+  mandatory_comma: true
+
+# A multi-line condition or signature puts its opening brace on its own line.
+opening_brace:
+  ignore_multiline_function_signatures: true
+  ignore_multiline_statement_conditions: true
+
+# An exhaustive switch over an enum is one decision, not one per case.
+cyclomatic_complexity:
+  ignores_case_statements: true
+
+identifier_name:
+  excluded:
+    # SwiftLint's default exclusion, which setting this list replaces.
+    - id
+    # Operands of comparators and paired test fixtures.
+    - a
+    - b
